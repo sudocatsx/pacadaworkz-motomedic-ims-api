@@ -11,10 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-         Schema::table('stock_adjustments',function (Blueprint $table){
-               $table->dropColumn('adjustment_no');
-                $table->timestamp('updated_at')->nullable();
-         });
+        Schema::table('stock_adjustments', function (Blueprint $table) {
+            $table->dropUnique('stock_adjustments_adjustment_no_unique');
+        });
+
+        Schema::table('stock_adjustments', function (Blueprint $table) {
+            $table->dropColumn('adjustment_no');
+            $table->timestamp('updated_at')->nullable();
+        });
     }
 
     /**
@@ -22,9 +26,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('stock_adjustments',function (Blueprint $table){
-               $table->string('adjustment_no', 50)->unique();
-               $table->dropColumn('updated_at');
+        Schema::table('stock_adjustments', function (Blueprint $table) {
+            $table->string('adjustment_no', 50)->unique();
+            $table->dropColumn('updated_at');
         });
     }
 };

@@ -24,11 +24,11 @@ return new class extends Migration
             $table->integer('quantity_returned')->default(0)->after('quantity');
         });
 
-        // 3. Update stock_movements reference_type pseudo-enum to include 'return' for PostgreSQL
-        // Laravel's enum for PostgreSQL creates a VARCHAR with a CHECK constraint.
-        // We need to drop and re-add the CHECK constraint with the new value.
-        DB::statement('ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS stock_movements_reference_type_check');
-        DB::statement("ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_reference_type_check CHECK (reference_type IN ('purchase', 'sale', 'adjustment', 'return'))");
+        if (DB::getDriverName() === 'pgsql') {
+            // Laravel's PostgreSQL enum creates a VARCHAR with a CHECK constraint.
+            DB::statement('ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS stock_movements_reference_type_check');
+            DB::statement("ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_reference_type_check CHECK (reference_type IN ('purchase', 'sale', 'adjustment', 'return'))");
+        }
     }
 
     /**
@@ -46,8 +46,9 @@ return new class extends Migration
             $table->dropColumn('quantity_returned');
         });
 
-        // 3. Revert stock_movements pseudo-enum for PostgreSQL
-        DB::statement('ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS stock_movements_reference_type_check');
-        DB::statement("ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_reference_type_check CHECK (reference_type IN ('purchase', 'sale', 'adjustment'))");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS stock_movements_reference_type_check');
+            DB::statement("ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_reference_type_check CHECK (reference_type IN ('purchase', 'sale', 'adjustment'))");
+        }
     }
 };
