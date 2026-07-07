@@ -20,6 +20,7 @@ class AuthUserResource extends JsonResource
                 return [
                     'id' => $this->role->id,
                     'role_name' => $this->role->role_name,
+                    'permissions' => PermissionResource::collection($this->role->permissions),
                 ];
             }),
             'name' => $this->name,

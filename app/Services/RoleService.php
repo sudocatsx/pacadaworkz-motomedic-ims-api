@@ -16,13 +16,13 @@ class RoleService
 
     public function getAllRoles()
     {
-        return Role::all();
+        return Role::with('permissions')->withCount('users')->get();
     }
 
     public function getRoleById($id)
     {
 
-        return Role::findOrFail($id);
+        return Role::with('permissions')->withCount('users')->findOrFail($id);
     }
 
 
@@ -40,7 +40,7 @@ class RoleService
             userId: auth()->id()
         );
 
-        return $role;
+        return $role->load('permissions')->loadCount('users');
     }
 
 
@@ -59,7 +59,7 @@ class RoleService
             userId: auth()->id()
         );
 
-        return $role;
+        return $role->load('permissions')->loadCount('users');
     }
 
 

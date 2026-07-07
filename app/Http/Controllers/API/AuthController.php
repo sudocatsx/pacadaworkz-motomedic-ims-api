@@ -49,7 +49,10 @@ class AuthController extends Controller
     {
         try {
             $refresh = $this->authService->refresh();
-            return response()->json($refresh);
+            return response()->json([
+                'success' => true,
+                'data' => $refresh,
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

@@ -52,10 +52,11 @@ public function login(array $credentials)
     {
         $user = auth('api')->user();
 
-        $new_access_token = auth('api')->setTTL(60)->fromUser($user);
+        $accessToken = auth('api')->setTTL(60)->fromUser($user);
 
         return [
-            'new_access_token' => $new_access_token,
+            'access_token' => $accessToken,
+            'new_access_token' => $accessToken,
             'token_type'   => 'bearer',
             'expires_in'   => 60 * 60
 
@@ -84,7 +85,7 @@ public function login(array $credentials)
     {
         $user = auth('api')->user();
         if ($user) {
-            $user->load('role');
+            $user->load('role.permissions');
         }
         return $user;
     }

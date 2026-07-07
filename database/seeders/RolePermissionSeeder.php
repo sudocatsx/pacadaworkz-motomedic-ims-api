@@ -15,15 +15,50 @@ class RolePermissionSeeder extends Seeder
      */
     public function run()
     {
-        // Get all permissions
         $permissions = Permission::all();
+        $permissionsByModule = $permissions->groupBy('module');
 
-        // Get the superadmin role
-        $superAdminRole = Role::where('role_name', 'superadmin')->first();
+        $permissionIds = function (array $matrix) use ($permissionsByModule) {
+            return collect($matrix)->flatMap(function (array $actions, string $module) use ($permissionsByModule) {
+                return $permissionsByModule
+                    ->get($module, collect())
+                    ->whereIn('name', $actions)
+                    ->pluck('id');
+            })->values();
+        };
 
-        // Assign all permissions to the superadmin role
-        if ($superAdminRole) {
-            $superAdminRole->permissions()->sync($permissions->pluck('id'));
+        $roleMatrices = [
+            'superadmin' => $permissions->pluck('id'),
+            'admin' => $permissionIds([
+                'Dashboard' => ['View', 'Create'],
+                'Inventory' => ['View', 'Create', 'Edit', 'Delete'],
+                'Products' => ['View', 'Create', 'Edit', 'Delete'],
+                'Categories' => ['View', 'Create', 'Edit', 'Delete'],
+                'Brands' => ['View', 'Create', 'Edit', 'Delete'],
+                'Attributes' => ['View', 'Create', 'Edit', 'Delete'],
+                'Suppliers' => ['View', 'Create', 'Edit', 'Delete'],
+                'Purchases' => ['View', 'Create', 'Edit', 'Delete'],
+                'Users' => ['View', 'Create', 'Edit', 'Delete'],
+                'Roles' => ['View', 'Create', 'Edit', 'Delete'],
+                'POS' => ['Access', 'Create Transaction'],
+                'Reports' => ['View', 'Export'],
+                'Activity Logs' => ['View All', 'Export'],
+                'Settings' => ['View', 'Edit'],
+            ]),
+            'staff' => $permissionIds([
+                'Dashboard' => ['View'],
+                'Inventory' => ['View'],
+                'Products' => ['View'],
+                'Purchases' => ['View', 'Create'],
+                'POS' => ['Access', 'Create Transaction'],
+            ]),
+        ];
+
+        foreach ($roleMatrices as $roleName => $permissionIds) {
+            $role = Role::where('role_name', $roleName)->first();
+            if ($role) {
+                $role->permissions()->sync($permissionIds);
+            }
         }
     }
 }
