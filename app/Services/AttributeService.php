@@ -44,7 +44,10 @@ class AttributeService{
  //crate new Attribute
         public function create(array $data){
     
-            $attribute = Attribute::create(['name'=> $data['name']]);
+            $attribute = Attribute::create([
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+            ]);
     
             $this->activityLogService->log(
                 'Attribute', // module
@@ -61,7 +64,10 @@ class AttributeService{
   public function update(array $data,$id){
       $attribute = Attribute::findOrFail($id);
 
-      $attribute->update($data);
+      $attribute->update([
+          'name' => $data['name'],
+          'description' => $data['description'] ?? null,
+      ]);
 
                   $this->activityLogService->log(
                       'Attribute', // module

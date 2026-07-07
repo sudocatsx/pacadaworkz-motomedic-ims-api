@@ -30,6 +30,7 @@ class AttributeRequest extends FormRequest
                     ->ignore($this->route('id'))
                     ->whereNull('deleted_at'),
             ],
+            'description' => 'sometimes|nullable|string|max:500',
         ];
     }
 }

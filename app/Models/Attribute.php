@@ -12,7 +12,8 @@ class Attribute extends Model
     //
     // fillable is for mass assigment (allowed na ifill up)
       protected $fillable = [
-        'name'
+        'name',
+        'description',
     ];
 
       //Entity Reletionship to the attribute values
