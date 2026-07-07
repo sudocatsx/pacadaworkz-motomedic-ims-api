@@ -1,0 +1,103 @@
+<?php
+
+use App\Models\Attribute;
+use App\Models\AttributesValue;
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+
+beforeEach(function () {
+    $this->seed(RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RolePermissionSeeder::class);
+});
+
+function masterDataUserForRole(string $roleName = 'admin'): User
+{
+    $role = Role::where('role_name', $roleName)->firstOrFail();
+
+    return User::factory()->create([
+        'role_id' => $role->id,
+    ]);
+}
+
+test('brand list uses the standard success data meta envelope', function () {
+    Brand::create(['name' => 'Yamaha', 'description' => 'Motorcycle parts']);
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->getJson('/api/v1/brands?per_page=25')
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('meta.per_page', 25)
+        ->assertJsonStructure([
+            'data' => [
+                '*' => ['id', 'name', 'description', 'products_count'],
+            ],
+            'meta' => ['current_page', 'per_page', 'total', 'last_page', 'total_pages'],
+        ]);
+});
+
+test('category deletion is blocked while products use it', function () {
+    $category = Category::create(['name' => 'Engine Parts']);
+    $brand = Brand::create(['name' => 'Honda']);
+
+    Product::create([
+        'category_id' => $category->id,
+        'brand_id' => $brand->id,
+        'sku' => 'ENG-001',
+        'name' => 'Oil Filter',
+        'unit_price' => 350,
+        'cost_price' => 200,
+    ]);
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->deleteJson("/api/v1/categories/{$category->id}")
+        ->assertStatus(409)
+        ->assertJsonPath('success', false);
+});
+
+test('product creation stores attribute values and exposes relationship ids', function () {
+    $category = Category::create(['name' => 'Accessories']);
+    $brand = Brand::create(['name' => 'Motomedic']);
+    $attribute = Attribute::create(['name' => 'Color']);
+    $value = AttributesValue::create([
+        'attribute_id' => $attribute->id,
+        'value' => 'Black',
+    ]);
+
+    $response = $this->actingAs(masterDataUserForRole(), 'api')
+        ->postJson('/api/v1/products', [
+            'category_id' => $category->id,
+            'brand_id' => $brand->id,
+            'sku' => 'ACC-001',
+            'name' => 'Helmet Visor',
+            'unit_price' => 900,
+            'cost_price' => 500,
+            'reorder_level' => 3,
+            'initial_stock' => 2,
+            'location' => 'Shelf A',
+            'attribute_value_ids' => [$value->id],
+        ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.category_id', $category->id)
+        ->assertJsonPath('data.brand_id', $brand->id)
+        ->assertJsonPath('data.attributes.0.attribute_id', $attribute->id);
+
+    $this->assertDatabaseHas('product_attributes', [
+        'attribute_value_id' => $value->id,
+    ]);
+});
+
+test('product export route returns csv instead of being treated as product id', function () {
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->get('/api/v1/products/export')
+        ->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=utf-8');
+});

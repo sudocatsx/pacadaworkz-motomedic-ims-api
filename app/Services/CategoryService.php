@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 use App\Models\Category;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class CategoryService{
 
@@ -12,16 +13,20 @@ class CategoryService{
     }
 
 
- public function getAllCategories($search = null){
+ public function getAllCategories($search = null, $perPage = 10){
 
       $query = Category::query();
 
       if($search)
       {
-        $query->where('name','Ilike',"%{$search}%")->orWhere('description','Ilike',"%{$search}%");
+        $search = strtolower($search);
+        $query->where(function ($query) use ($search) {
+            $query->whereRaw('LOWER(name) LIKE ?', ["%{$search}%"])
+                ->orWhereRaw('LOWER(description) LIKE ?', ["%{$search}%"]);
+        });
       }
 
-     return $query->paginate(10)->withQueryString();
+     return $query->withCount('products')->paginate($perPage)->withQueryString();
  }
 
 
@@ -83,6 +88,10 @@ class CategoryService{
 
     $category = Category::findOrFail($id);
     $categoryName = $category->name;
+
+    if ($category->products()->exists()) {
+        throw new ConflictHttpException('Category cannot be deleted while products are assigned to it.');
+    }
 
     $category->delete();
 

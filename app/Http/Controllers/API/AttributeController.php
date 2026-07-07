@@ -10,6 +10,7 @@ use App\Http\Requests\Attribute\AttributeRequest;
 use App\Http\Resources\AttributesValueResource;
 use App\Http\Requests\Attribute\AttributesValueRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class AttributeController
 {
@@ -28,7 +29,8 @@ class AttributeController
 
         try {
             $search = $request->query('search', null);
-            $result = $this->attributeService->getAllAttributes($search);
+            $perPage = $request->query('per_page', 10);
+            $result = $this->attributeService->getAllAttributes($search, $perPage);
             return response()->json([
                 'success' => true,
                 'data' => AttributeResource::collection($result),
@@ -36,6 +38,7 @@ class AttributeController
                     'current_page' => $result->currentPage(),
                     'per_page' => $result->perPage(),
                     'total' => $result->total(),
+                    'last_page' => $result->lastPage(),
                     'total_pages' => $result->lastPage(),
                 ],
             ]);
@@ -62,6 +65,11 @@ class AttributeController
                 'success' => false,
                 'message' => 'Attribute not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -186,6 +194,11 @@ class AttributeController
                 'success' => false,
                 'message' => 'Attribute value not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

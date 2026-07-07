@@ -8,6 +8,7 @@ use App\Http\Resources\SupplierResource;
 use App\Services\SupplierService;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class SupplierController extends Controller
 {
@@ -22,7 +23,8 @@ class SupplierController extends Controller
     {
         try {
             $search = $request->query('search', null);
-            $suppliers = $this->supplierService->getAllSuppliers($search);
+            $perPage = $request->query('per_page', 10);
+            $suppliers = $this->supplierService->getAllSuppliers($search, $perPage);
             
             return response()->json([
                 'success' => true,
@@ -31,7 +33,8 @@ class SupplierController extends Controller
                     'current_page' => $suppliers->currentPage(),
                     'per_page' => $suppliers->perPage(),
                     'total' => $suppliers->total(),
-                    'last_page' => $suppliers->lastPage()
+                    'last_page' => $suppliers->lastPage(),
+                    'total_pages' => $suppliers->lastPage()
                 ]
             ]);
         } catch (\Exception $e) {
@@ -71,6 +74,11 @@ class SupplierController extends Controller
                 'success' => false,
                 'message' => 'Supplier not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

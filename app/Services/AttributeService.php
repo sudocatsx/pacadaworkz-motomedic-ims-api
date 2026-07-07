@@ -5,6 +5,7 @@ use App\Models\Attribute;
 use App\Models\AttributesValue;
 use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class AttributeService{
 
@@ -17,16 +18,18 @@ class AttributeService{
  
 
     //get all attributes
-     public function getAllAttributes($search = null){
+     public function getAllAttributes($search = null, $perPage = 10){
     
         $query = Attribute::with('attribute_values.attribute');
        
-        if($search)
-            $query->where('name','like',"%{$search}%");
+        if($search) {
+            $search = strtolower($search);
+            $query->whereRaw('LOWER(name) LIKE ?', ["%{$search}%"]);
+        }
 
 
 
-        return $query->paginate(10)->withQueryString();
+        return $query->paginate($perPage)->withQueryString();
      }
 
 
@@ -74,8 +77,10 @@ class AttributeService{
    public function delete($id){
         $attribute = Attribute::findOrFail($id);
         $attributeName = $attribute->name; // Capture name before deletion
-        $attributeId = $attribute->id;
-        $attributeTable = $attribute->getTable();
+
+        if ($attribute->attribute_values()->exists()) {
+            throw new ConflictHttpException('Attribute cannot be deleted while values are assigned to it.');
+        }
 
         $attribute->delete();
 
@@ -134,6 +139,10 @@ class AttributeService{
        $attribute_value = AttributesValue::findOrFail($valueId);
        $valueText = $attribute_value->value;
        $attributeName = $attribute_value->attribute->name;
+
+       if ($attribute_value->products()->exists()) {
+           throw new ConflictHttpException('Attribute value cannot be deleted while products use it.');
+       }
 
        $attribute_value->delete();
 

@@ -12,6 +12,7 @@ use App\Http\Requests\Product\ProductUpdateRequest;
 use App\Http\Requests\Product\ProductAttributeRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ProductController
 {
@@ -32,9 +33,10 @@ class ProductController
             $search = $request->query('search', null);
             $categoryId = $request->query('category_id', null);
             $brandId = $request->query('brand_id', null);
+            $perPage = $request->query('per_page', 10);
 
 
-            $result = $this->productService->getAllProducts($search, $categoryId, $brandId);
+            $result = $this->productService->getAllProducts($search, $categoryId, $brandId, $perPage);
             return response()->json([
                 'success' => true,
                 'data' => ProductResource::collection($result),
@@ -42,7 +44,8 @@ class ProductController
                     'current_page' => $result->currentPage(),
                     'per_page' => $result->perPage(),
                     'total' => $result->total(),
-                    'last_page' => $result->lastPage()
+                    'last_page' => $result->lastPage(),
+                    'total_pages' => $result->lastPage()
                 ]
             ]);
         } catch (\Exception $e) {
@@ -75,6 +78,11 @@ class ProductController
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -105,6 +113,11 @@ class ProductController
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -136,6 +149,11 @@ class ProductController
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -167,6 +185,11 @@ class ProductController
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

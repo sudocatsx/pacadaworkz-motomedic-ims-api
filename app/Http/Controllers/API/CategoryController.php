@@ -7,6 +7,7 @@ use App\Http\Requests\CategoryRequest;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 class CategoryController extends Controller
 {
 
@@ -20,7 +21,8 @@ class CategoryController extends Controller
     public function index(Request $request){
        try{
                 $search = $request->query('search',null);
-               $result = $this->categoryService->getAllCategories($search);
+                $perPage = $request->query('per_page', 10);
+               $result = $this->categoryService->getAllCategories($search, $perPage);
         return response()->json([
             'success' =>true,
             'data' => CategoryResource::collection($result),
@@ -28,6 +30,7 @@ class CategoryController extends Controller
                     'current_page' => $result->currentPage(),
                     'per_page' => $result->perPage(),
                     'total' => $result->total(),
+                    'last_page' => $result->lastPage(),
                     'total_pages' => $result->lastPage(),
                 ],
         ]);
@@ -126,6 +129,11 @@ class CategoryController extends Controller
                 'success' => false,
                 'message' => 'Category not found'
             ], 404);
+      }catch(ConflictHttpException $e){
+                   return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
       }catch(\Exception $e){
               
                    return response()->json([

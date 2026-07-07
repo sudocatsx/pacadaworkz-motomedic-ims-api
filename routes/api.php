@@ -133,12 +133,12 @@ Route::prefix('v1')->group(function () {
             // Products
             Route::middleware('modules:Products')->prefix('products')->group(function () {
                 Route::get('/', [ProductController::class, 'index'])->middleware('permissions:View');
+                Route::get('/export', [ProductController::class, 'export'])->middleware('permissions:View');
                 Route::get('/{id}', [ProductController::class, 'show'])->middleware('permissions:View');
                 Route::post('/', [ProductController::class, 'store'])->middleware('permissions:Create');
                 Route::put('/{id}', [ProductController::class, 'update'])->middleware('permissions:Edit');
                 Route::delete('/{id}', [ProductController::class, 'destroy'])->middleware('permissions:Delete');
 
-                Route::get('/export', [ProductController::class, 'export'])->middleware('permissions:View');
                 Route::post('/{id}/attributes/{attributeId}', [ProductController::class, 'storeAttribute'])->middleware('permissions:Edit');
                 Route::delete('/{id}/attributeValueId/{attributeProductId}', [ProductController::class, 'destroyAttributeProduct'])->middleware('permissions:Edit');
             });

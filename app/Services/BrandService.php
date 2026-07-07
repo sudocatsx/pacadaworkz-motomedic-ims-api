@@ -3,6 +3,7 @@ namespace App\Services;
 use App\Models\Brand;
 use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class BrandService{
 
@@ -19,11 +20,15 @@ public function getAllBrands($search = null, $perPage = 10){
 
     if($search)
     {
-        $query->where('name','Ilike',"%{$search}%")->orWhere('description','Ilike','%{$search}%');
+        $search = strtolower($search);
+        $query->where(function ($query) use ($search) {
+            $query->whereRaw('LOWER(name) LIKE ?', ["%{$search}%"])
+                ->orWhereRaw('LOWER(description) LIKE ?', ["%{$search}%"]);
+        });
     }
 
 
-    return $query->paginate($perPage)->withQueryString();
+    return $query->withCount('products')->paginate($perPage)->withQueryString();
 
 }
 
@@ -92,6 +97,10 @@ public function delete($id){
     $brand = Brand::findOrFail($id);
 
     $brandName = $brand->name; // Capture name before deletion
+
+    if ($brand->products()->exists()) {
+        throw new ConflictHttpException('Brand cannot be deleted while products are assigned to it.');
+    }
 
     
 

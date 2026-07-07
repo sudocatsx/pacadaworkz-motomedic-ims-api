@@ -6,6 +6,8 @@ use App\Models\Product;
 use App\Models\Attribute;
 use App\Models\ProductAttribute;
 use App\Services\ActivityLogService;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ProductService
 {
@@ -20,21 +22,23 @@ class ProductService
 
 
     // get all products
-    public function getAllProducts($search = null, $categoryId = null, $brandId = null)
+    public function getAllProducts($search = null, $categoryId = null, $brandId = null, $perPage = 10)
     {
         $query = Product::query()
+            ->with(['category', 'brand', 'inventory', 'attribute_values.attribute'])
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
             ->leftJoin('brands', 'brands.id', '=', 'products.brand_id')
             ->leftJoin('inventory', 'inventory.product_id', '=', 'products.id')
             ->select('products.*', 'inventory.quantity as current_stock');
 
         if ($search) {
+            $search = strtolower($search);
             $query->where(function ($q) use ($search) {
-                $q->where('products.name', 'ILIKE', "%{$search}%")
-                    ->orWhere('products.description', 'ILIKE', "%{$search}%")
-                    ->orWhere('products.sku', 'ILIKE', "%{$search}%")
-                    ->orWhere('categories.name', 'ILIKE', "%{$search}%")
-                    ->orWhere('brands.name', 'ILIKE', "%{$search}%");
+                $q->whereRaw('LOWER(products.name) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(products.description) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(products.sku) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(categories.name) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(brands.name) LIKE ?', ["%{$search}%"]);
             });
         }
 
@@ -46,7 +50,7 @@ class ProductService
             $query->where('products.brand_id', $brandId);
         }
 
-        return $query->paginate(10)->withQueryString();
+        return $query->paginate($perPage)->withQueryString();
     }
 
 
@@ -54,7 +58,7 @@ class ProductService
     public function getProductById($id)
     {
 
-        return Product::findOrFail($id);
+        return Product::with(['category', 'brand', 'inventory', 'attribute_values.attribute'])->findOrFail($id);
     }
 
 
@@ -62,7 +66,7 @@ class ProductService
     // create  products
     public function create(array $data)
     {
-        return \DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data) {
             $product = Product::create([
                 'category_id' => $data['category_id'],
                 'brand_id' => $data['brand_id'],
@@ -83,6 +87,8 @@ class ProductService
                 'last_stock_in' => ($data['initial_stock'] ?? 0) > 0 ? now() : null,
             ]);
 
+            $this->syncAttributeValues($product, $data['attribute_value_ids'] ?? []);
+
             // Log activity
             $this->activityLogService->log(
                 module: 'Products',
@@ -90,7 +96,7 @@ class ProductService
                 description: "Created product: {$product->name} (SKU: {$product->sku}) and initialized inventory",
                 userId: auth()->id()
             );
-            return $product;
+            return $product->load(['category', 'brand', 'inventory', 'attribute_values.attribute']);
         });
     }
 
@@ -99,20 +105,40 @@ class ProductService
     public function update(array $data, $id)
     {
 
-        $product = Product::findOrFail($id);
-        $oldName = $product->name;
+        return DB::transaction(function () use ($data, $id) {
+            $product = Product::findOrFail($id);
+            $oldName = $product->name;
+            $attributeValueIds = $data['attribute_value_ids'] ?? null;
+            $inventoryData = [
+                'quantity' => $data['initial_stock'] ?? null,
+                'location' => $data['location'] ?? null,
+            ];
+            unset($data['attribute_value_ids']);
+            unset($data['initial_stock'], $data['location']);
 
-        $product->update($data);
+            $product->update($data);
 
-        // Log activity
-        $this->activityLogService->log(
-            module: 'Products',
-            action: 'Edit',
-            description: "Updated product: {$oldName} to {$product->name} (SKU: {$product->sku})",
-            userId: auth()->id()
-        );
+            if ($inventoryData['quantity'] !== null || $inventoryData['location'] !== null) {
+                $product->inventory()->updateOrCreate(
+                    ['product_id' => $product->id],
+                    array_filter($inventoryData, fn ($value) => $value !== null)
+                );
+            }
 
-        return $product;
+            if (is_array($attributeValueIds)) {
+                $this->syncAttributeValues($product, $attributeValueIds);
+            }
+
+            // Log activity
+            $this->activityLogService->log(
+                module: 'Products',
+                action: 'Edit',
+                description: "Updated product: {$oldName} to {$product->name} (SKU: {$product->sku})",
+                userId: auth()->id()
+            );
+
+            return $product->load(['category', 'brand', 'inventory', 'attribute_values.attribute']);
+        });
     }
     //delete product
     public function delete($id)
@@ -120,6 +146,15 @@ class ProductService
 
         $product = Product::findOrFail($id);
         $productName = $product->name;
+
+        if (
+            $product->purchase_items()->exists()
+            || $product->sales_items()->exists()
+            || $product->stock_movements()->exists()
+            || ($product->inventory && $product->inventory->quantity > 0)
+        ) {
+            throw new ConflictHttpException('Product cannot be deleted while stock or transaction records use it.');
+        }
 
         $result = $product->delete();
 
@@ -188,5 +223,30 @@ class ProductService
         return ProductAttribute::where('product_id', $id)
             ->where('attribute_value_id', $attributeValueId)
             ->delete();
+    }
+
+    private function syncAttributeValues(Product $product, array $attributeValueIds): void
+    {
+        $attributeValueIds = collect($attributeValueIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $query = ProductAttribute::where('product_id', $product->id);
+
+        if ($attributeValueIds->isEmpty()) {
+            $query->delete();
+            return;
+        }
+
+        $query->whereNotIn('attribute_value_id', $attributeValueIds)->delete();
+
+        foreach ($attributeValueIds as $attributeValueId) {
+            ProductAttribute::updateOrCreate(
+                ['product_id' => $product->id, 'attribute_value_id' => $attributeValueId],
+                ['product_id' => $product->id, 'attribute_value_id' => $attributeValueId]
+            );
+        }
     }
 }

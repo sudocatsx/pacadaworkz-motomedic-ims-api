@@ -22,7 +22,7 @@ class ProductAttributeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'attribute_value_id' => 'required'
+            'attribute_value_id' => 'required|integer|exists:attributes_values,id',
         ];
     }
 }
