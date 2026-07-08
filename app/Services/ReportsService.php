@@ -99,11 +99,23 @@ class ReportsService
             ->orderBy('date')
             ->get();
 
+        $purchaseBySupplier = DB::table('purchase_orders')
+            ->leftJoin('suppliers', 'purchase_orders.supplier_id', '=', 'suppliers.id')
+            ->whereBetween('purchase_orders.created_at', [$start, $end])
+            ->selectRaw("COALESCE(suppliers.name, 'Unknown Supplier') as supplier_name, SUM(purchase_orders.total_amount) as total")
+            ->groupByRaw("COALESCE(suppliers.name, 'Unknown Supplier')")
+            ->orderByDesc('total')
+            ->get()
+            ->mapWithKeys(fn ($supplier) => [
+                $supplier->supplier_name => (float) $supplier->total,
+            ]);
+
         return [
             'total_purchases' => $ordersQuery->sum('total_amount'),
             'purchase_orders' => $ordersQuery->count(),
             'average_orders' => $averageOrder,
-            'trend' => $trend
+            'trend' => $trend,
+            'purchase_by_supplier' => $purchaseBySupplier,
         ];
     }
 

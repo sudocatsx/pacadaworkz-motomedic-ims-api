@@ -39,6 +39,12 @@ class ReportCSVService
         foreach ($data['trend'] as $trend) {
             $csvData[] = [$trend->date, $trend->total];
         }
+        $csvData[] = [];
+        $csvData[] = ['Purchase by Supplier'];
+        $csvData[] = ['Supplier', 'Total Purchases'];
+        foreach ($data['purchase_by_supplier'] as $supplier => $total) {
+            $csvData[] = [$supplier, $total];
+        }
         return $this->arrayToCsv($csvData);
     }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Role;
+use App\Models\Supplier;
 use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\PermissionSeeder;
@@ -41,6 +42,21 @@ function createSalesTransactionForDate(User $user, string $date, float $total): 
         'amount_tendered' => $total,
         'change' => 0,
         'status' => 'completed',
+        'created_at' => Carbon::parse($date),
+        'updated_at' => Carbon::parse($date),
+    ]);
+}
+
+function createPurchaseOrderForDate(User $user, Supplier $supplier, string $date, float $total): void
+{
+    DB::table('purchase_orders')->insert([
+        'supplier_id' => $supplier->id,
+        'user_id' => $user->id,
+        'order_date' => Carbon::parse($date)->toDateString(),
+        'expected_delivery' => null,
+        'total_amount' => $total,
+        'status' => 'received',
+        'notes' => null,
         'created_at' => Carbon::parse($date),
         'updated_at' => Carbon::parse($date),
     ]);
@@ -92,4 +108,30 @@ test('custom report period uses explicit start and end dates', function () {
         ->assertJsonPath('data.transactions', 2)
         ->assertJsonPath('data.trend.0.date', '2026-07-01')
         ->assertJsonPath('data.trend.1.date', '2026-07-05');
+});
+
+test('purchase report groups totals by supplier from backend data', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
+
+    $user = reportsUserForRole();
+    $supplierA = Supplier::create(['name' => 'MotorPro Supply']);
+    $supplierB = Supplier::create(['name' => 'Rider Parts Co.']);
+
+    createPurchaseOrderForDate($user, $supplierA, '2026-07-05 10:00:00', 500);
+    createPurchaseOrderForDate($user, $supplierA, '2026-07-06 10:00:00', 300);
+    createPurchaseOrderForDate($user, $supplierB, '2026-07-11 10:00:00', 1200);
+    createPurchaseOrderForDate($user, $supplierB, '2026-07-12 10:00:00', 900);
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/purchases?period=weekly');
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.total_purchases', 2000)
+        ->assertJsonPath('data.purchase_orders', 3);
+
+    expect($response->json('data.purchase_by_supplier'))->toBe([
+        'Rider Parts Co.' => 1200,
+        'MotorPro Supply' => 800,
+    ]);
 });
