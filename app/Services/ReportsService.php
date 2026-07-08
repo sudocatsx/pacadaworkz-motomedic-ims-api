@@ -54,6 +54,18 @@ class ReportsService
             ->orderBy('date')
             ->get();
 
+        $staffNameExpression = "COALESCE(NULLIF(users.name, ''), NULLIF(TRIM(users.first_name || ' ' || users.last_name), ''), 'Unknown Staff')";
+        $salesByStaff = DB::table('sales_transactions')
+            ->leftJoin('users', 'sales_transactions.user_id', '=', 'users.id')
+            ->whereBetween('sales_transactions.created_at', [$start, $end])
+            ->selectRaw("{$staffNameExpression} as staff_name, SUM(sales_transactions.total_amount) as total")
+            ->groupByRaw($staffNameExpression)
+            ->orderByDesc('total')
+            ->get()
+            ->mapWithKeys(fn ($staff) => [
+                $staff->staff_name => (float) $staff->total,
+            ]);
+
         if ($start && $end) {
             $query->whereBetween('created_at', [$start, $end]);
         }
@@ -63,7 +75,8 @@ class ReportsService
             'total_sales' => $query->sum('total_amount'),
             'transactions' => $query->count(),
             'average_transaction' => round($query->avg('total_amount'), 2),
-            'trend' => $trend
+            'trend' => $trend,
+            'sales_by_staff' => $salesByStaff,
         ];
     }
 

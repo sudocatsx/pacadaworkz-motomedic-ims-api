@@ -50,20 +50,29 @@ test('weekly report period uses sunday through saturday instead of rolling seven
     Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
 
     $user = reportsUserForRole();
+    $secondUser = reportsUserForRole();
+    $user->update(['name' => 'Maria Santos']);
+    $secondUser->update(['name' => 'Juan Dela Cruz']);
 
     createSalesTransactionForDate($user, '2026-07-01 10:00:00', 100);
     createSalesTransactionForDate($user, '2026-07-05 10:00:00', 200);
-    createSalesTransactionForDate($user, '2026-07-11 10:00:00', 300);
+    createSalesTransactionForDate($secondUser, '2026-07-11 10:00:00', 300);
     createSalesTransactionForDate($user, '2026-07-12 10:00:00', 400);
 
-    $this->actingAs($user, 'api')
-        ->getJson('/api/v1/reports/sales?period=weekly')
-        ->assertOk()
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?period=weekly');
+
+    $response->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.total_sales', 500)
         ->assertJsonPath('data.transactions', 2)
         ->assertJsonPath('data.trend.0.date', '2026-07-05')
         ->assertJsonPath('data.trend.1.date', '2026-07-11');
+
+    expect($response->json('data.sales_by_staff'))->toBe([
+        'Juan Dela Cruz' => 300,
+        'Maria Santos' => 200,
+    ]);
 });
 
 test('custom report period uses explicit start and end dates', function () {
