@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\ActivityLogService;
 use App\Http\Resources\ActivityLogResource;
 use Illuminate\Auth\Access\AuthorizationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class ActivityLogController
+class ActivityLogController extends Controller
 {
     protected $logservice;
 
@@ -21,50 +20,50 @@ class ActivityLogController
     // show logs
     public function showLogs(Request $request)
     {
-        try {
-            // OPTIONAL: kung may policy
-            // $this->authorize('viewAny', ActivityLog::class);
+        $user = $request->user('api');
+        $canViewAll = $this->hasActivityLogsPermission($user, 'View All');
+        $canViewOwn = $this->hasActivityLogsPermission($user, 'View Own');
 
-            $search = $request->query('search');
-            $userId = $request->query('user_id');
-
-            $result = $this->logservice->getLogs($search, $userId);
-
-            return response()->json([
-                'success' => true,
-                'data' => ActivityLogResource::collection($result),
-                'meta' => [
-                    'current_page' => $result->currentPage(),
-                    'per_page' => $result->perPage(),
-                    'total' => $result->total(),
-                    'total_pages' => $result->lastPage(),
-                ],
-            ]);
-
-        } catch (AuthorizationException $e) {
-            //  REAL 403
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden'
-            ], 403);
-
-        } catch (\Throwable $e) {
-            //  REAL server error
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred',
-                 'error' => $e->getMessage() // enable lang sa debug
-            ], 500);
+        if (!$canViewAll && !$canViewOwn) {
+            throw new AuthorizationException();
         }
+
+        $filters = $this->validatedFilters($request);
+        $result = $this->logservice->getLogs($filters, $user, $canViewAll);
+        $filterOptions = $this->logservice->getFilterOptions($user, $canViewAll);
+
+        return response()->json([
+            'success' => true,
+            'data' => ActivityLogResource::collection($result),
+            'meta' => [
+                'current_page' => $result->currentPage(),
+                'per_page' => $result->perPage(),
+                'total' => $result->total(),
+                'last_page' => $result->lastPage(),
+                'total_pages' => $result->lastPage(),
+                'filter_options' => $filterOptions,
+                'permissions' => [
+                    'view_all' => $canViewAll,
+                    'view_own' => $canViewOwn,
+                    'export' => $this->hasActivityLogsPermission($user, 'Export'),
+                ],
+            ],
+        ]);
     }
 
     // export activity logs
-    public function export()
+    public function export(Request $request)
     {
-        // OPTIONAL AUTH
-        // $this->authorize('export', ActivityLog::class);
+        $user = $request->user('api');
+        $canViewAll = $this->hasActivityLogsPermission($user, 'View All');
+        $canViewOwn = $this->hasActivityLogsPermission($user, 'View Own');
 
-        $logs = $this->logservice->getExport();
+        if (!$this->hasActivityLogsPermission($user, 'Export') || (!$canViewAll && !$canViewOwn)) {
+            throw new AuthorizationException();
+        }
+
+        $filters = $this->validatedFilters($request);
+        $logs = $this->logservice->getExport($filters, $user, $canViewAll);
 
         $response = new StreamedResponse(function () use ($logs) {
             $handle = fopen('php://output', 'w');
@@ -90,5 +89,35 @@ class ActivityLogController
         );
 
         return $response;
+    }
+
+    private function validatedFilters(Request $request): array
+    {
+        return $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'module' => ['nullable', 'string', 'max:50'],
+            'action' => ['nullable', 'string', 'max:100'],
+            'user_id' => ['nullable', 'integer'],
+            'period' => ['nullable', 'string', 'in:all,today,last_7_days,last_month,custom'],
+            'start_date' => ['required_if:period,custom', 'nullable', 'date_format:Y-m-d'],
+            'end_date' => ['required_if:period,custom', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+    }
+
+    private function hasActivityLogsPermission($user, string $permissionName): bool
+    {
+        if (!$user || !$user->role) {
+            return false;
+        }
+
+        if (!$user->role->relationLoaded('permissions')) {
+            $user->role->load('permissions');
+        }
+
+        return $user->role->permissions->contains(function ($permission) use ($permissionName) {
+            return $permission->module === 'Activity Logs' && $permission->name === $permissionName;
+        });
     }
 }

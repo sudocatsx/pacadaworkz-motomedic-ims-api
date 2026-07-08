@@ -59,7 +59,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:superadmin,admin,staff')->group(function () {
             // activity-logs
             Route::prefix('activity-logs')->middleware('modules:Activity Logs')->group(function () {
-                Route::get('/', [ActivityLogController::class, 'showLogs'])->middleware('permissions:View All');
+                Route::get('/', [ActivityLogController::class, 'showLogs'])->middleware('permissions:View Own,View All');
                 Route::get('/export', [ActivityLogController::class, 'export'])->middleware('permissions:Export');
             });
             // Users
