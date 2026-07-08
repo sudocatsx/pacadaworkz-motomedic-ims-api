@@ -42,6 +42,62 @@ test('brand list uses the standard success data meta envelope', function () {
         ]);
 });
 
+test('plain brand list requests do not create activity logs', function () {
+    Brand::create(['name' => 'Yamaha', 'description' => 'Motorcycle parts']);
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->getJson('/api/v1/brands')
+        ->assertOk();
+
+    $this->assertDatabaseCount('activity_logs', 0);
+});
+
+test('brand list requests with query params do not create activity logs', function () {
+    Brand::create(['name' => 'Yamaha', 'description' => 'Motorcycle parts']);
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->getJson('/api/v1/brands?search=yamaha&per_page=25&page=1')
+        ->assertOk();
+
+    $this->assertDatabaseCount('activity_logs', 0);
+});
+
+test('product export requests create an activity log audit event', function () {
+    $user = masterDataUserForRole();
+
+    $this->actingAs($user, 'api')
+        ->get('/api/v1/products/export')
+        ->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=utf-8');
+
+    $this->assertDatabaseHas('activity_logs', [
+        'user_id' => $user->id,
+        'module' => 'Products',
+        'action' => 'View',
+        'description' => 'Export Products',
+    ]);
+});
+
+test('brand creation still creates an activity log through the service', function () {
+    $user = masterDataUserForRole();
+
+    $this->actingAs($user, 'api')
+        ->postJson('/api/v1/brands', [
+            'name' => 'Kawasaki',
+            'description' => 'OEM parts',
+        ])
+        ->assertOk();
+
+    $this->assertDatabaseHas('activity_logs', [
+        'user_id' => $user->id,
+        'module' => 'Brand',
+        'action' => 'created',
+        'description' => 'Brand created: Kawasaki',
+    ]);
+
+    $this->assertDatabaseCount('activity_logs', 1);
+});
+
 test('category deletion is blocked while products use it', function () {
     $category = Category::create(['name' => 'Engine Parts']);
     $brand = Brand::create(['name' => 'Honda']);
