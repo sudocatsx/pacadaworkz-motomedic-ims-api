@@ -21,25 +21,28 @@ class ReportsService
         $this->reportCSVService = $reportCSVService;
     }
 
+    private function normalizeDateRange($start = null, $end = null, ?string $fallbackTable = null): array
+    {
+        if (!$start && $fallbackTable) {
+            $start = DB::table($fallbackTable)->min('created_at');
+        }
+
+        $start = $start
+            ? Carbon::parse($start)->startOfDay()
+            : Carbon::today()->startOfDay();
+
+        $end = $end
+            ? Carbon::parse($end)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        return [$start, $end];
+    }
+
     // sales report
     public function getSalesReport($start = null, $end = null)
     {
 
-
-        // Set start date
-        if (!$start) {
-            $start = DB::table('sales_transactions')->min('created_at');
-            $start = $start
-                ? Carbon::parse($start)->startOfDay()
-                : Carbon::today()->startOfDay();
-        } else {
-            $start = Carbon::parse($start)->startOfDay();
-        }
-
-        // Set end date
-        $end = $end
-            ? Carbon::parse($end)->endOfDay()
-            : Carbon::today()->endOfDay();
+        [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_transactions');
 
 
         $query = SalesTransaction::query();
@@ -68,8 +71,7 @@ class ReportsService
     // purchase report
     public function getPurchases($start = null, $end = null)
     {
-        $start = $start ?? Carbon::now()->format('Y-m-d');
-        $end = $end ?? Carbon::now()->format('Y-m-d');
+        [$start, $end] = $this->normalizeDateRange($start, $end, 'purchase_orders');
 
         //  $itemsQuery = PurchaseItem::query(); baka magamit soon
         $ordersQuery = PurchaseOrder::query();
@@ -149,13 +151,8 @@ class ReportsService
 
     public function getPerformance($start = null, $end = null)
     {
-        if (!isset($start)) {
-            $start = DB::table('sales_items')->min('created_at'); // returns earliest datetime or null
-            $start = $start ? Carbon::parse($start)->startOfDay() : Carbon::today()->startOfDay();
-        }
+        [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_items');
 
-        // Kung walang $end, default today
-        $end = $end ?? Carbon::today()->endOfDay();
         $revenueByCategory = DB::table('categories as a')
             ->leftJoin('products as b', 'a.id', '=', 'b.category_id')
             ->leftJoin('sales_items as c', function ($join) use ($start, $end) {
@@ -192,20 +189,7 @@ class ReportsService
 
     public function getStockAdjustments($start = null, $end = null)
     {
-        // Set start date
-        if (!$start) {
-            $start = DB::table('stock_adjustments')->min('created_at');
-            $start = $start
-                ? Carbon::parse($start)->startOfDay()
-                : Carbon::today()->startOfDay();
-        } else {
-            $start = Carbon::parse($start)->startOfDay();
-        }
-
-        // Set end date
-        $end = $end
-            ? Carbon::parse($end)->endOfDay()
-            : Carbon::today()->endOfDay();
+        [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_adjustments');
 
         // Total adjustments count
         $totalAdjustments = DB::table('stock_adjustments')
@@ -245,12 +229,7 @@ class ReportsService
 
     public function getProfitLossReport($start = null, $end = null)
     {
-        if (!isset($start)) {
-            $start = DB::table('stock_movements')->min('created_at'); // returns earliest datetime or null
-            $start = $start ? Carbon::parse($start)->startOfDay() : Carbon::today()->startOfDay();
-        }
-        // Kung walang $end, default today
-        $end = $end ?? Carbon::today()->endOfDay();
+        [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_movements');
 
         // Revenue
         $revenue = SalesTransaction::whereBetween('created_at', [$start, $end])
