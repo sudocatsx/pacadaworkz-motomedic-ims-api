@@ -43,6 +43,8 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'first_name',
         'last_name',
+        'contact_number',
+        'is_active',
         'google_id',
         'theme'
     ];
@@ -66,6 +68,7 @@ class User extends Authenticatable implements JWTSubject
     {
         return [
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

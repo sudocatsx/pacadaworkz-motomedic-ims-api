@@ -32,6 +32,7 @@ class UserFactory extends Factory
             'last_name' => $lastName,
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
+            'contact_number' => fake()->optional()->numerify('09#########'),
         ];
     }
 }

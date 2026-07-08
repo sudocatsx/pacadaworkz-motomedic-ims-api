@@ -5,6 +5,7 @@ namespace App\Http\Requests\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -26,9 +27,16 @@ class UpdateUserRequest extends FormRequest
         return [
             'role_id' => 'sometimes|integer|exists:roles,id',
             'name' => 'sometimes|string|min:1|max:50',
-            'email' => 'sometimes|email|unique:users,email',
+            'email' => [
+                'sometimes',
+                'email',
+                Rule::unique('users', 'email')
+                    ->ignore($this->route('id'))
+                    ->withoutTrashed(),
+            ],
             'first_name' => 'sometimes|string|max:50',
             'last_name' => 'sometimes|string|max:50',
+            'contact_number' => ['nullable', 'string', 'max:30', 'regex:/^\d+$/'],
             'is_active' => 'sometimes|boolean',
 
             'id' => 'prohibited',

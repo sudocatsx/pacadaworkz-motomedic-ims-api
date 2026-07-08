@@ -24,7 +24,7 @@ class ResetPasswordUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'new_password' => 'nullable|string|min:6',
+            'new_password' => 'required_if:is_default_password,false|nullable|string|min:6',
 
             // if true ito, yung new_password input ay disabled. So NULL ang value ng new_password
             'is_default_password' => 'required|boolean'

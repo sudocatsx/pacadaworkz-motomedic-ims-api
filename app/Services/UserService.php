@@ -143,7 +143,7 @@ class UserService
              * NOTE: set niyo yung USER_DEFAULT_PASSWORD sa .env
              *
              **/
-            $newPassword = $isDefaultPassword ? env('USER_DEFAULT_PASSWORD', 'Password@2026!') : $fields['new_password'];
+            $newPassword = $isDefaultPassword ? env('USER_DEFAULT_PASSWORD', 'Password@2025!') : $fields['new_password'];
 
             $user->update([
                 'password' => Hash::make($newPassword)

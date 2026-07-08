@@ -14,6 +14,7 @@ namespace App\Swagger\Schemas;
  *     @OA\Property(property="email", type="string", format="email", description="User's email address"),
  *     @OA\Property(property="first_name", type="string", description="First name"),
  *     @OA\Property(property="last_name", type="string", description="Last name"),
+ *     @OA\Property(property="contact_number", type="string", nullable=true, description="Contact number"),
  *     @OA\Property(property="is_active", type="boolean", description="Active status")
  * )
  *
@@ -21,13 +22,14 @@ namespace App\Swagger\Schemas;
  *     schema="StoreUserRequest",
  *     type="object",
  *     title="Store User Request",
- *     required={"role_id", "name", "email", "password", "first_name", "last_name", "is_default_password"},
+ *     required={"role_id", "name", "email", "first_name", "last_name", "is_default_password"},
  *     @OA\Property(property="role_id", type="integer", description="Role ID"),
  *     @OA\Property(property="name", type="string", description="Username", minLength=1, maxLength=50),
  *     @OA\Property(property="email", type="string", format="email", description="Email address"),
- *     @OA\Property(property="password", type="string", format="password", description="Password", minLength=6),
+ *     @OA\Property(property="password", type="string", format="password", nullable=true, description="Password required when is_default_password is false", minLength=6),
  *     @OA\Property(property="first_name", type="string", description="First name", maxLength=50),
  *     @OA\Property(property="last_name", type="string", description="Last name", maxLength=50),
+ *     @OA\Property(property="contact_number", type="string", nullable=true, description="Digits-only contact number", maxLength=30),
  *     @OA\Property(property="is_default_password", type="boolean", description="Is default password")
  * )
  *
@@ -40,6 +42,7 @@ namespace App\Swagger\Schemas;
  *     @OA\Property(property="email", type="string", format="email", description="Email address"),
  *     @OA\Property(property="first_name", type="string", description="First name", maxLength=50),
  *     @OA\Property(property="last_name", type="string", description="Last name", maxLength=50),
+ *     @OA\Property(property="contact_number", type="string", nullable=true, description="Digits-only contact number", maxLength=30),
  *     @OA\Property(property="is_active", type="boolean", description="Is active")
  * )
  *
