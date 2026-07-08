@@ -18,6 +18,9 @@ class DashboardService
     // get dashboard stats
     public function getStats()
     {
+        $todayStart = Carbon::today()->startOfDay();
+        $todayEnd = Carbon::today()->endOfDay();
+
         $userCount = User::count();
         $productCount = Product::count();
         $transactionCount = SalesTransaction::where('status', '!=', 'voided')->count();
@@ -29,33 +32,80 @@ class DashboardService
         $revenue = (float) SalesTransaction::where('status', '!=', 'voided')
             ->sum(DB::raw('subtotal - refund_amount'));
 
+        $todaysSales = (float) SalesTransaction::where('status', '!=', 'voided')
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
+            ->sum(DB::raw('total_amount - refund_amount'));
+
+        $todaysTransactions = SalesTransaction::where('status', '!=', 'voided')
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
+            ->count();
+
+        $todaysItemsSold = (int) SalesItem::join('sales_transactions', 'sales_items.sales_transactions_id', '=', 'sales_transactions.id')
+            ->where('sales_transactions.status', '!=', 'voided')
+            ->whereBetween('sales_transactions.created_at', [$todayStart, $todayEnd])
+            ->sum(DB::raw('sales_items.quantity - sales_items.quantity_returned'));
+
+        $todaysPurchases = (float) DB::table('purchase_orders')
+            ->whereDate('order_date', Carbon::today()->toDateString())
+            ->where('status', '!=', 'cancelled')
+            ->sum('total_amount');
+
+        $todaysCostOfGoodsSold = (float) DB::table('sales_items')
+            ->join('sales_transactions', 'sales_items.sales_transactions_id', '=', 'sales_transactions.id')
+            ->join('products', 'products.id', '=', 'sales_items.product_id')
+            ->where('sales_transactions.status', '!=', 'voided')
+            ->whereBetween('sales_transactions.created_at', [$todayStart, $todayEnd])
+            ->sum(DB::raw('(sales_items.quantity - sales_items.quantity_returned) * products.cost_price'));
+
+        $todaysStockAdjustmentLosses = (float) DB::table('stock_adjustments')
+            ->join('stock_movements', 'stock_adjustments.id', '=', 'stock_movements.reference_id')
+            ->join('products', 'products.id', '=', 'stock_movements.product_id')
+            ->where('stock_movements.reference_type', 'adjustment')
+            ->where('stock_movements.movement_type', 'out')
+            ->whereBetween('stock_adjustments.created_at', [$todayStart, $todayEnd])
+            ->sum(DB::raw('stock_movements.quantity * products.cost_price'));
+
+        $todaysNetProfit = $todaysSales - $todaysCostOfGoodsSold - $todaysStockAdjustmentLosses;
+
         $lowstock = Inventory::join('products', 'inventory.product_id', '=', 'products.id')
             ->whereNull('products.deleted_at')
             ->whereColumn('inventory.quantity', '<=', 'products.reorder_level')
             ->where('inventory.quantity', '>', 0)
             ->count();
 
-        $outOfStock = Inventory::where('quantity', 0)->count();
+        $outOfStock = Inventory::join('products', 'inventory.product_id', '=', 'products.id')
+            ->whereNull('products.deleted_at')
+            ->where('inventory.quantity', 0)
+            ->count();
 
         $user = auth('api')->user();
+        $dailyStats = [
+            'todays_sales' => $todaysSales,
+            'todays_transactions' => $todaysTransactions,
+            'todays_items_sold' => $todaysItemsSold,
+            'todays_purchases' => $todaysPurchases,
+            'todays_cost_of_goods_sold' => $todaysCostOfGoodsSold,
+            'todays_stock_adjustment_losses' => $todaysStockAdjustmentLosses,
+            'todays_net_profit' => $todaysNetProfit,
+            'low_stock' => $lowstock,
+            'out_of_stock' => $outOfStock,
+        ];
 
         if ($user->role->role_name == 'admin' || $user->role->role_name == 'superadmin') {
-            return [
+            return array_merge($dailyStats, [
                 'total_products' => $productCount,
                 'total_revenue' => $revenue,
                 'total_transactions' => $transactionCount,
                 'total_sales' => $salesItem,
-                'low_stock' => $lowstock,
-                'out_of_stock' => $outOfStock,
                 'active_users' => $userCount
-            ];
+            ]);
         } else if ($user->role->role_name == 'staff') {
-            return [
+            return array_merge($dailyStats, [
                 'total_products' => $productCount,
-                'low_stock' => $lowstock,
-                'out_of_stock' => $outOfStock,
-            ];
+            ]);
         }
+
+        return $dailyStats;
     }
 
     // get sales trend
