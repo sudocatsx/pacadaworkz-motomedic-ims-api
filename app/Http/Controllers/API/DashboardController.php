@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Services\DashboardService;
 use App\Http\Controllers\API\Controller;
+use App\Http\Resources\RevenueByBrandResource;
 use App\Http\Resources\RevenueByCategoryResource;
 use App\Http\Resources\SalesTrendResource;
 use App\Http\Resources\TopProductResource;
@@ -81,6 +82,21 @@ class DashboardController
             return response()->json([
                 'success' => true,
                 'data' => RevenueByCategoryResource::toKeyValue($result)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // show revenue per brand
+    public function showRevenueByBrand()
+    {
+        try {
+            $result = $this->dashboardService->getRevenueByBrand();
+
+            return response()->json([
+                'success' => true,
+                'data' => RevenueByBrandResource::toKeyValue($result)
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

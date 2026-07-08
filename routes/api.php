@@ -220,7 +220,8 @@ Route::prefix('v1')->group(function () {
             //Dashboard
             Route::prefix('dashboard')->middleware('modules:Dashboard')->group(function () {
                 Route::get('/charts/inventory-overview', [DashboardController::class, 'showInventoryOverview'])->middleware('permissions:View');
-                Route::get('/charts/revenue-by-category', [DashboardController::class, 'showRevenueByCategory'])->middleware('permissions:View');;
+                Route::get('/charts/revenue-by-category', [DashboardController::class, 'showRevenueByCategory'])->middleware('permissions:View');
+                Route::get('/charts/revenue-by-brand', [DashboardController::class, 'showRevenueByBrand'])->middleware('permissions:View');
             });
 
             //Reports

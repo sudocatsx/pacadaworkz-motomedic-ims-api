@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\SalesItem;
 use App\Models\Inventory;
 use App\Models\Category;
+use App\Models\Brand;
 use App\Models\ActivityLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -100,7 +101,7 @@ class DashboardService
         return Category::query()
             ->select(
                 'categories.name as category_name',
-                DB::raw('COALESCE(SUM(sales_items.unit_price * (sales_items.quantity - sales_items.quantity_returned)), 0) as total_revenue')
+                DB::raw('COALESCE(SUM(CASE WHEN sales_transactions.id IS NOT NULL THEN sales_items.unit_price * (sales_items.quantity - sales_items.quantity_returned) ELSE 0 END), 0) as total_revenue')
             )
             ->leftJoin('products', 'categories.id', '=', 'products.category_id')
             ->leftJoin('sales_items', 'products.id', '=', 'sales_items.product_id')
@@ -109,6 +110,25 @@ class DashboardService
                     ->where('sales_transactions.status', '!=', 'voided');
             })
             ->groupBy('categories.id', 'categories.name')
+            ->orderByDesc('total_revenue')
+            ->get();
+    }
+
+    // get revenue by brand
+    public function getRevenueByBrand()
+    {
+        return Brand::query()
+            ->select(
+                'brands.name as brand_name',
+                DB::raw('COALESCE(SUM(CASE WHEN sales_transactions.id IS NOT NULL THEN sales_items.unit_price * (sales_items.quantity - sales_items.quantity_returned) ELSE 0 END), 0) as total_revenue')
+            )
+            ->leftJoin('products', 'brands.id', '=', 'products.brand_id')
+            ->leftJoin('sales_items', 'products.id', '=', 'sales_items.product_id')
+            ->leftJoin('sales_transactions', function ($join) {
+                $join->on('sales_items.sales_transactions_id', '=', 'sales_transactions.id')
+                    ->where('sales_transactions.status', '!=', 'voided');
+            })
+            ->groupBy('brands.id', 'brands.name')
             ->orderByDesc('total_revenue')
             ->get();
     }
