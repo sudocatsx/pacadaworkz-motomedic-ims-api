@@ -122,8 +122,8 @@ class ReportsService
     //inventory report
     public function getInventory($start = null, $end = null)
     {
-        $start = $start ?? Carbon::now()->format('Y-m-d');
-        $end = $end ?? Carbon::now()->format('Y-m-d');
+        [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_movements');
+
         // query of product
         $productsQuery = Product::query();
         //inventory
@@ -131,6 +131,8 @@ class ReportsService
         // inventory value
         $totalInventoryValue = $inventory
             ->join('products', 'inventory.product_id', '=', 'products.id')
+            ->whereNull('products.deleted_at')
+            ->whereNull('inventory.deleted_at')
             ->select(DB::raw('SUM(products.cost_price * inventory.quantity) as total_value'))
             ->value('total_value');
 
@@ -142,32 +144,162 @@ class ReportsService
             ->whereColumn('inventory.quantity', '<=', 'products.reorder_level')
             ->where('inventory.quantity', '>', 0)
             ->count();
+
+        $lowStockItems = DB::table('inventory')
+            ->join('products', 'inventory.product_id', '=', 'products.id')
+            ->whereNull('products.deleted_at')
+            ->whereNull('inventory.deleted_at')
+            ->whereColumn('inventory.quantity', '<=', 'products.reorder_level')
+            ->where('inventory.quantity', '>', 0)
+            ->select(
+                'products.id',
+                'products.name',
+                'products.sku',
+                'inventory.quantity as current_stock',
+                'products.reorder_level as reorder_point'
+            )
+            ->orderBy('inventory.quantity')
+            ->orderBy('products.name')
+            ->get();
+
         // no stock
         $noStock =  DB::table('inventory')
-            ->whereNull('deleted_at')
-            ->where('quantity', '=', 0)
+            ->join('products', 'inventory.product_id', '=', 'products.id')
+            ->whereNull('products.deleted_at')
+            ->whereNull('inventory.deleted_at')
+            ->where('inventory.quantity', '=', 0)
             ->count();
+
+        $outOfStockItems = DB::table('inventory')
+            ->join('products', 'inventory.product_id', '=', 'products.id')
+            ->whereNull('products.deleted_at')
+            ->whereNull('inventory.deleted_at')
+            ->where('inventory.quantity', '<=', 0)
+            ->select(
+                'products.id',
+                'products.name',
+                'products.sku',
+                'products.reorder_level as reorder_point'
+            )
+            ->orderBy('products.name')
+            ->get();
 
         //product distribution by category
         $distCategory = DB::table('categories as a')
             ->join('products as b', 'b.category_id', '=', 'a.id')
+            ->whereNull('a.deleted_at')
+            ->whereNull('b.deleted_at')
             ->select('a.name', DB::raw('COUNT(b.category_id) as total'))
             ->groupBy('a.name')
+            ->orderBy('a.name')
             ->get();
         // inventory value by category
         $valCategory = DB::table('categories as a')
             ->join('products as b', 'b.category_id', '=', 'a.id')
             ->join('inventory as c', 'c.product_id', '=', 'b.id')
-            ->select('a.name', DB::raw('SUM(c.quantity * b.unit_price) as inventory_value'))
+            ->whereNull('a.deleted_at')
+            ->whereNull('b.deleted_at')
+            ->whereNull('c.deleted_at')
+            ->select('a.name', DB::raw('SUM(c.quantity * b.cost_price) as inventory_value'))
             ->groupBy('a.name')
+            ->orderBy('a.name')
             ->get();
+
+        $movementSummary = DB::table('stock_movements')
+            ->whereBetween('created_at', [$start, $end])
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN movement_type = 'in' THEN quantity ELSE 0 END), 0) as stock_in_quantity,
+                COALESCE(SUM(CASE WHEN movement_type = 'out' THEN quantity ELSE 0 END), 0) as stock_out_quantity,
+                COUNT(*) as movement_count
+            ")
+            ->first();
+
+        $movementBySource = DB::table('stock_movements')
+            ->whereBetween('created_at', [$start, $end])
+            ->select(
+                'reference_type',
+                DB::raw('SUM(quantity) as quantity'),
+                DB::raw('COUNT(*) as count')
+            )
+            ->groupBy('reference_type')
+            ->orderBy('reference_type')
+            ->get()
+            ->mapWithKeys(fn ($source) => [
+                $source->reference_type => [
+                    'quantity' => (int) $source->quantity,
+                    'count' => (int) $source->count,
+                ],
+            ]);
+
+        $topMovedProducts = DB::table('stock_movements as sm')
+            ->join('products as p', 'sm.product_id', '=', 'p.id')
+            ->whereNull('p.deleted_at')
+            ->whereBetween('sm.created_at', [$start, $end])
+            ->select(
+                'p.id',
+                'p.name',
+                'p.sku',
+                DB::raw("SUM(CASE WHEN sm.movement_type = 'in' THEN sm.quantity ELSE 0 END) as stock_in"),
+                DB::raw("SUM(CASE WHEN sm.movement_type = 'out' THEN sm.quantity ELSE 0 END) as stock_out"),
+                DB::raw('SUM(sm.quantity) as total_moved')
+            )
+            ->groupBy('p.id', 'p.name', 'p.sku')
+            ->orderByDesc('total_moved')
+            ->limit(10)
+            ->get()
+            ->map(fn ($product) => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'stock_in' => (int) $product->stock_in,
+                'stock_out' => (int) $product->stock_out,
+                'net_change' => (int) $product->stock_in - (int) $product->stock_out,
+                'total_moved' => (int) $product->total_moved,
+            ]);
+
+        $userNameExpression = "COALESCE(NULLIF(users.name, ''), NULLIF(TRIM(users.first_name || ' ' || users.last_name), ''), 'System')";
+        $recentMovements = DB::table('stock_movements as sm')
+            ->join('products as p', 'sm.product_id', '=', 'p.id')
+            ->leftJoin('users', 'sm.user_id', '=', 'users.id')
+            ->whereNull('p.deleted_at')
+            ->whereBetween('sm.created_at', [$start, $end])
+            ->selectRaw("
+                sm.id,
+                sm.created_at,
+                p.name as product_name,
+                p.sku,
+                sm.movement_type,
+                sm.quantity,
+                sm.reference_type,
+                {$userNameExpression} as user_name
+            ")
+            ->orderByDesc('sm.created_at')
+            ->orderByDesc('sm.id')
+            ->limit(20)
+            ->get();
+
+        $stockInQuantity = (int) ($movementSummary->stock_in_quantity ?? 0);
+        $stockOutQuantity = (int) ($movementSummary->stock_out_quantity ?? 0);
+
         return [
             'total_products' => $productsQuery->count(),
             'total_value' => $totalInventoryValue,
             'low_stock' => $lowStock,
             'out_of_stock' => $noStock,
+            'low_stock_items' => $lowStockItems,
+            'out_of_stock_items' => $outOfStockItems,
             'ditribution_category' => $distCategory,
-            'inventory_value_category' => $valCategory
+            'distribution_category' => $distCategory,
+            'inventory_value_category' => $valCategory,
+            'movement_summary' => [
+                'stock_in_quantity' => $stockInQuantity,
+                'stock_out_quantity' => $stockOutQuantity,
+                'net_stock_change' => $stockInQuantity - $stockOutQuantity,
+                'movement_count' => (int) ($movementSummary->movement_count ?? 0),
+            ],
+            'movement_by_source' => $movementBySource,
+            'top_moved_products' => $topMovedProducts,
+            'recent_movements' => $recentMovements,
         ];
     }
 

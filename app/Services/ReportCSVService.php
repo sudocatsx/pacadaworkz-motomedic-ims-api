@@ -57,9 +57,33 @@ class ReportCSVService
         $csvData[] = ['Low Stock Products', $data['low_stock']];
         $csvData[] = ['Out of Stock Products', $data['out_of_stock']];
         $csvData[] = [];
+        $csvData[] = ['Stock Movement Summary'];
+        $csvData[] = ['Stock In Quantity', $data['movement_summary']['stock_in_quantity']];
+        $csvData[] = ['Stock Out Quantity', $data['movement_summary']['stock_out_quantity']];
+        $csvData[] = ['Net Stock Change', $data['movement_summary']['net_stock_change']];
+        $csvData[] = ['Movement Count', $data['movement_summary']['movement_count']];
+        $csvData[] = [];
+        $csvData[] = ['Movement by Source'];
+        $csvData[] = ['Source', 'Quantity', 'Count'];
+        foreach ($data['movement_by_source'] as $source => $movement) {
+            $csvData[] = [$source, $movement['quantity'], $movement['count']];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Low Stock Items'];
+        $csvData[] = ['Product', 'SKU', 'Current Stock', 'Reorder Point'];
+        foreach ($data['low_stock_items'] as $item) {
+            $csvData[] = [$item->name, $item->sku, $item->current_stock, $item->reorder_point];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Out of Stock Items'];
+        $csvData[] = ['Product', 'SKU', 'Reorder Point'];
+        foreach ($data['out_of_stock_items'] as $item) {
+            $csvData[] = [$item->name, $item->sku, $item->reorder_point];
+        }
+        $csvData[] = [];
         $csvData[] = ['Product Distribution by Category'];
         $csvData[] = ['Category', 'Total Products'];
-        foreach ($data['ditribution_category'] as $dist) {
+        foreach ($data['distribution_category'] as $dist) {
             $csvData[] = [$dist->name, $dist->total];
         }
         $csvData[] = [];
@@ -67,6 +91,33 @@ class ReportCSVService
         $csvData[] = ['Category', 'Inventory Value'];
         foreach ($data['inventory_value_category'] as $val) {
             $csvData[] = [$val->name, $val->inventory_value];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Top Moved Products'];
+        $csvData[] = ['Product', 'SKU', 'Stock In', 'Stock Out', 'Net Change', 'Total Moved'];
+        foreach ($data['top_moved_products'] as $product) {
+            $csvData[] = [
+                $product['name'],
+                $product['sku'],
+                $product['stock_in'],
+                $product['stock_out'],
+                $product['net_change'],
+                $product['total_moved'],
+            ];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Recent Stock Movements'];
+        $csvData[] = ['Date', 'Product', 'SKU', 'Type', 'Quantity', 'Source', 'User'];
+        foreach ($data['recent_movements'] as $movement) {
+            $csvData[] = [
+                $movement->created_at,
+                $movement->product_name,
+                $movement->sku,
+                $movement->movement_type,
+                $movement->quantity,
+                $movement->reference_type,
+                $movement->user_name,
+            ];
         }
 
         return $this->arrayToCsv($csvData);
