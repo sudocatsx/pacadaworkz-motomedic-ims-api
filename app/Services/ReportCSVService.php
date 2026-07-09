@@ -157,6 +157,17 @@ class ReportCSVService
         foreach ($data['revenue_by_brand'] as $item) {
             $csvData[] = [$item->name, $item->total];
         }
+        $csvData[] = [];
+        $csvData[] = ['Top Selling Products'];
+        $csvData[] = ['Product ID', 'Product', 'Quantity Sold', 'Revenue'];
+        foreach ($data['top_products'] as $item) {
+            $csvData[] = [
+                $item['product_id'],
+                $item['product_name'],
+                $item['quantity_sold'],
+                $item['revenue'],
+            ];
+        }
         return $csvData;
     }
 

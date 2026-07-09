@@ -8,6 +8,7 @@ use App\Models\PurchaseItem;
 use App\Models\PurchaseOrder;
 use App\Models\Product;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
 use App\Services\ReportCSVService;
 
@@ -38,6 +39,23 @@ class ReportsService
         return [$start, $end];
     }
 
+    private function dailyTrendSeries(Carbon $start, Carbon $end, $totals)
+    {
+        $totalsByDate = collect($totals)->keyBy('date');
+
+        return collect(CarbonPeriod::create($start->copy()->startOfDay(), $end->copy()->startOfDay()))
+            ->map(function (Carbon $date) use ($totalsByDate) {
+                $dateKey = $date->toDateString();
+                $total = $totalsByDate->get($dateKey)->total ?? 0;
+
+                return (object) [
+                    'date' => $dateKey,
+                    'total' => (float) $total,
+                ];
+            })
+            ->values();
+    }
+
     // sales report
     public function getSalesReport($start = null, $end = null)
     {
@@ -46,13 +64,14 @@ class ReportsService
 
 
         $query = SalesTransaction::query();
-        $trend = SalesTransaction::selectRaw('DATE(created_at) as date, SUM(total_amount) as total')
+        $trendTotals = SalesTransaction::selectRaw('DATE(created_at) as date, SUM(total_amount) as total')
             ->when($start && $end, function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
             })
             ->groupBy('date')
             ->orderBy('date')
             ->get();
+        $trend = $this->dailyTrendSeries($start, $end, $trendTotals);
 
         $staffNameExpression = "COALESCE(NULLIF(users.name, ''), NULLIF(TRIM(users.first_name || ' ' || users.last_name), ''), 'Unknown Staff')";
         $salesByStaff = DB::table('sales_transactions')
@@ -91,13 +110,14 @@ class ReportsService
         $ordersQuery->whereBetween('created_at', [$start, $end]);
         $averageOrder = round($ordersQuery->avg('total_amount'), 2) ?? 0;
 
-        $trend = PurchaseOrder::selectRaw('DATE(created_at) as date, SUM(total_amount)as total')
+        $trendTotals = PurchaseOrder::selectRaw('DATE(created_at) as date, SUM(total_amount)as total')
             ->when($start && $end, function ($x) use ($start, $end) {
                 $x->whereBetween('created_at', [$start, $end]);
             })
             ->groupBy('date')
             ->orderBy('date')
             ->get();
+        $trend = $this->dailyTrendSeries($start, $end, $trendTotals);
 
         $purchaseBySupplier = DB::table('purchase_orders')
             ->leftJoin('suppliers', 'purchase_orders.supplier_id', '=', 'suppliers.id')
@@ -309,15 +329,19 @@ class ReportsService
     public function getPerformance($start = null, $end = null)
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_items');
+        $netQuantityExpression = "CASE WHEN (c.quantity - COALESCE(c.quantity_returned, 0)) > 0 THEN (c.quantity - COALESCE(c.quantity_returned, 0)) ELSE 0 END";
+        $validRevenueExpression = "CASE WHEN st.id IS NOT NULL AND st.status != 'voided' THEN c.unit_price * {$netQuantityExpression} ELSE 0 END";
 
         $revenueByCategory = DB::table('categories as a')
             ->leftJoin('products as b', 'a.id', '=', 'b.category_id')
             ->leftJoin('sales_items as c', function ($join) use ($start, $end) {
                 $join->on('b.id', '=', 'c.product_id')
                     ->whereBetween('c.created_at', [$start, $end]);
-            })->select(
+            })
+            ->leftJoin('sales_transactions as st', 'c.sales_transactions_id', '=', 'st.id')
+            ->select(
                 'a.name',
-                DB::raw('COALESCE(SUM(c.unit_price * c.quantity), 0) as total')
+                DB::raw("COALESCE(SUM({$validRevenueExpression}), 0) as total")
             )
             ->groupBy('a.name')
             ->orderBy('a.name')
@@ -329,17 +353,46 @@ class ReportsService
             ->leftJoin('sales_items as c', function ($join) use ($start, $end) {
                 $join->on('b.id', '=', 'c.product_id')
                     ->whereBetween('c.created_at', [$start, $end]);
-            })->select(
+            })
+            ->leftJoin('sales_transactions as st', 'c.sales_transactions_id', '=', 'st.id')
+            ->select(
                 'a.name',
-                DB::raw('COALESCE(SUM(c.unit_price * c.quantity), 0) as total')
+                DB::raw("COALESCE(SUM({$validRevenueExpression}), 0) as total")
             )
             ->groupBy('a.name')
             ->orderBy('a.name')
             ->get();
 
+        $topProducts = DB::table('sales_items as c')
+            ->join('products as p', 'c.product_id', '=', 'p.id')
+            ->join('sales_transactions as st', 'c.sales_transactions_id', '=', 'st.id')
+            ->whereBetween('st.created_at', [$start, $end])
+            ->where('st.status', '!=', 'voided')
+            ->whereNull('p.deleted_at')
+            ->select(
+                'p.id as product_id',
+                'p.name as product_name',
+                DB::raw("SUM({$netQuantityExpression}) as quantity_sold"),
+                DB::raw("SUM(c.unit_price * {$netQuantityExpression}) as revenue")
+            )
+            ->groupBy('p.id', 'p.name')
+            ->havingRaw("SUM({$netQuantityExpression}) > 0")
+            ->orderByDesc('quantity_sold')
+            ->orderByDesc('revenue')
+            ->orderBy('p.name')
+            ->limit(10)
+            ->get()
+            ->map(fn ($product) => [
+                'product_id' => $product->product_id,
+                'product_name' => $product->product_name,
+                'quantity_sold' => (int) $product->quantity_sold,
+                'revenue' => (float) $product->revenue,
+            ]);
+
         return [
             'revenue_by_category' => $revenueByCategory,
-            'revenue_by_brand' => $revenueByBrand
+            'revenue_by_brand' => $revenueByBrand,
+            'top_products' => $topProducts,
         ];
     }
 
