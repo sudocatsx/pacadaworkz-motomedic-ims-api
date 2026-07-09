@@ -127,11 +127,15 @@ class DashboardService
     // get top products
     public function getTopProducts()
     {
+        $start = Carbon::now()->subDays(6)->startOfDay();
+        $end = Carbon::now()->endOfDay();
+
         return Product::query()
             ->leftJoin('sales_items', 'products.id', '=', 'sales_items.product_id')
-            ->leftJoin('sales_transactions', function ($join) {
+            ->leftJoin('sales_transactions', function ($join) use ($start, $end) {
                 $join->on('sales_items.sales_transactions_id', '=', 'sales_transactions.id')
-                    ->where('sales_transactions.status', '!=', 'voided');
+                    ->where('sales_transactions.status', '!=', 'voided')
+                    ->whereBetween('sales_transactions.created_at', [$start, $end]);
             })
             ->whereNull('products.deleted_at')
             ->select(

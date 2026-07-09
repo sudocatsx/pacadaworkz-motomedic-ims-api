@@ -250,3 +250,25 @@ test('dashboard stats return today sales purchases net profit and stock alerts',
         ->assertJsonPath('data.low_stock', 1)
         ->assertJsonPath('data.out_of_stock', 1);
 });
+
+test('dashboard top products only counts sales from the last seven days', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
+
+    $user = dashboardUserForRole();
+    $recentProductId = createDashboardRevenueProduct('Recent Category', 'Recent Brand', 'Recent Product', 'REC-001');
+    $oldProductId = createDashboardRevenueProduct('Old Category', 'Old Brand', 'Old Product', 'OLD-001');
+    $voidedProductId = createDashboardRevenueProduct('Voided Top Category', 'Voided Top Brand', 'Voided Top Product', 'VTOP-001');
+
+    createDashboardSalesItem($user, $recentProductId, 'completed', 7, 2, 100, '2026-07-02 09:00:00');
+    createDashboardSalesItem($user, $oldProductId, 'completed', 50, 0, 100, '2026-07-01 09:00:00');
+    createDashboardSalesItem($user, $voidedProductId, 'voided', 20, 0, 100, '2026-07-08 09:00:00');
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/dashboard/charts/top-products');
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.Recent Product', 5)
+        ->assertJsonPath('data.Old Product', 0)
+        ->assertJsonPath('data.Voided Top Product', 0);
+});
