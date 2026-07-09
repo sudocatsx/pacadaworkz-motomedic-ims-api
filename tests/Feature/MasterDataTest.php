@@ -6,10 +6,12 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Role;
+use App\Models\Supplier;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Http\UploadedFile;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -68,7 +70,7 @@ test('product export requests create an activity log audit event', function () {
     $this->actingAs($user, 'api')
         ->get('/api/v1/products/export')
         ->assertOk()
-        ->assertHeader('content-type', 'text/csv; charset=utf-8');
+        ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     $this->assertDatabaseHas('activity_logs', [
         'user_id' => $user->id,
@@ -151,9 +153,92 @@ test('product creation stores attribute values and exposes relationship ids', fu
     ]);
 });
 
-test('product export route returns csv instead of being treated as product id', function () {
+test('product export route returns xlsx instead of being treated as product id', function () {
     $this->actingAs(masterDataUserForRole(), 'api')
         ->get('/api/v1/products/export')
         ->assertOk()
+        ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+test('product export route still supports csv format', function () {
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->get('/api/v1/products/export?format=csv')
+        ->assertOk()
         ->assertHeader('content-type', 'text/csv; charset=utf-8');
+});
+
+test('catalog import template returns module specific xlsx attachment', function () {
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->get('/api/v1/imports/catalog-template?type=categories')
+        ->assertOk()
+        ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+test('catalog csv import creates new categories and skips duplicates', function () {
+    Category::create(['name' => 'Existing', 'description' => 'Already present']);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'categories.csv',
+        "name,description\nNew Category,Fresh row\nExisting,Duplicate row\n"
+    );
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->post('/api/v1/imports/catalog', [
+            'type' => 'categories',
+            'file' => $file,
+        ])
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.categories.created', 1)
+        ->assertJsonPath('data.categories.skipped', 1);
+
+    $this->assertDatabaseHas('categories', [
+        'name' => 'New Category',
+        'description' => 'Fresh row',
+    ]);
+});
+
+test('catalog csv import rejects product headers for supplier imports', function () {
+    $file = UploadedFile::fake()->createWithContent(
+        'products.csv',
+        "sku,name,category_name,brand_name,unit_price,cost_price,description,initial_stock,location,reorder_level,attribute_values\n" .
+        "ENG-001,Engine Oil,Fluids,Motul,500,300,Fully synthetic,10,Shelf A,3,\n"
+    );
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->post('/api/v1/imports/catalog', [
+            'type' => 'suppliers',
+            'file' => $file,
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('message', fn (string $message) => str_contains($message, 'suppliers import template'))
+        ->assertJsonPath('errors.file.0', fn (string $message) => str_contains($message, 'Unexpected columns: sku'));
+
+    $this->assertDatabaseCount('suppliers', 0);
+});
+
+test('catalog csv import creates suppliers with valid supplier headers', function () {
+    $file = UploadedFile::fake()->createWithContent(
+        'suppliers.csv',
+        "name,contact_person,email,phone,address\n" .
+        "Motul Philippines,Juan Dela Cruz,motul@example.test,09171234567,Manila\n"
+    );
+
+    $this->actingAs(masterDataUserForRole(), 'api')
+        ->post('/api/v1/imports/catalog', [
+            'type' => 'suppliers',
+            'file' => $file,
+        ])
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.suppliers.created', 1)
+        ->assertJsonPath('data.suppliers.failed', 0);
+
+    $this->assertDatabaseHas('suppliers', [
+        'name' => 'Motul Philippines',
+        'contact_person' => 'Juan Dela Cruz',
+        'email' => 'motul@example.test',
+        'phone' => '09171234567',
+        'address' => 'Manila',
+    ]);
 });

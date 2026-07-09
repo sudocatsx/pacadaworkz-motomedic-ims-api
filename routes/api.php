@@ -11,6 +11,7 @@ use App\Http\Controllers\API\StocksController;
 use App\Http\Controllers\API\ProductController;
 use App\Http\Controllers\API\ReportsController;
 use App\Http\Controllers\API\CategoryController;
+use App\Http\Controllers\API\CatalogImportController;
 use App\Http\Controllers\API\PurchaseController;
 use App\Http\Controllers\API\SupplierController;
 use App\Http\Controllers\API\AttributeController;
@@ -143,6 +144,12 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/{id}/attributeValueId/{attributeProductId}', [ProductController::class, 'destroyAttributeProduct'])->middleware('permissions:Edit');
             });
 
+            // Catalog imports
+            Route::prefix('imports')->middleware('modules:Products,Categories,Brands,Attributes,Suppliers')->group(function () {
+                Route::get('/catalog-template', [CatalogImportController::class, 'template'])->middleware('permissions:View,Create');
+                Route::post('/catalog', [CatalogImportController::class, 'import'])->middleware('permissions:Create');
+            });
+
             //inventory
             Route::prefix('inventory')->group(function () {
                 Route::middleware('modules:Inventory')->group(function () {
@@ -232,7 +239,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/product-performance', [ReportsController::class, 'showPerformance'])->middleware('permissions:View');
                 Route::get('/stock-adjustments', [ReportsController::class, 'showStockAdjustments'])->middleware('permissions:View');
                 Route::get('/profit-loss', [ReportsController::class, 'showProfitLossReport'])->middleware('permissions:View');
-                Route::get('/{type}/export', [ReportsController::class, 'showReportCSV'])->middleware('permissions:View');
+                Route::get('/{type}/export', [ReportsController::class, 'export'])->middleware('permissions:View');
             });
 
             // Settings

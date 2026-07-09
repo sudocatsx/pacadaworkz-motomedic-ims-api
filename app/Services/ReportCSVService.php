@@ -6,6 +6,11 @@ class ReportCSVService
 {
     public function exportSales($data)
     {
+        return $this->arrayToCsv($this->salesRows($data));
+    }
+
+    public function salesRows($data): array
+    {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
         $csvData[] = ['Total Sales', $data['total_sales']];
@@ -23,10 +28,15 @@ class ReportCSVService
         foreach ($data['sales_by_staff'] as $staff => $total) {
             $csvData[] = [$staff, $total];
         }
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportPurchase($data)
+    {
+        return $this->arrayToCsv($this->purchaseRows($data));
+    }
+
+    public function purchaseRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -45,10 +55,15 @@ class ReportCSVService
         foreach ($data['purchase_by_supplier'] as $supplier => $total) {
             $csvData[] = [$supplier, $total];
         }
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportInventory($data)
+    {
+        return $this->arrayToCsv($this->inventoryRows($data));
+    }
+
+    public function inventoryRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -120,10 +135,15 @@ class ReportCSVService
             ];
         }
 
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportPerformance($data)
+    {
+        return $this->arrayToCsv($this->performanceRows($data));
+    }
+
+    public function performanceRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Revenue by Category'];
@@ -137,10 +157,15 @@ class ReportCSVService
         foreach ($data['revenue_by_brand'] as $item) {
             $csvData[] = [$item->name, $item->total];
         }
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportAdjustments($data)
+    {
+        return $this->arrayToCsv($this->adjustmentRows($data));
+    }
+
+    public function adjustmentRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -152,10 +177,15 @@ class ReportCSVService
         foreach ($data['adjustments_by_reason'] as $reason) {
             $csvData[] = [$reason->reason, $reason->num_reasons];
         }
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportProfitAndLoss($data)
+    {
+        return $this->arrayToCsv($this->profitAndLossRows($data));
+    }
+
+    public function profitAndLossRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -166,7 +196,7 @@ class ReportCSVService
         $csvData[] = ['Net Profit', $data['net_profit']];
         $csvData[] = ['Profit Margin (%)', $data['profit_margin']];
 
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use Exception;
 use App\Services\ReportsService;
+use App\Services\SpreadsheetService;
 use App\Http\Controllers\API\Controller;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -11,10 +12,12 @@ use Illuminate\Http\Request;
 class ReportsController extends Controller
 {
     protected $reportsService;
+    protected $spreadsheetService;
 
-    public function __construct(ReportsService $reportsService)
+    public function __construct(ReportsService $reportsService, SpreadsheetService $spreadsheetService)
     {
         $this->reportsService = $reportsService;
+        $this->spreadsheetService = $spreadsheetService;
     }
 
     private function resolveDateRange(Request $request): array
@@ -173,13 +176,29 @@ class ReportsController extends Controller
     }
 
 
-    // export as csv 
-      public function showReportCSV($type,Request $request){
+      public function export($type,Request $request){
          try {
              [$start, $end] = $this->resolveDateRange($request);
-             
-             $result = $this->reportsService->getReportCSV($start,$end,$type);
-             return $result; 
+             $format = strtolower($request->query('format', 'xlsx'));
+
+             if ($format === 'csv') {
+                 $result = $this->reportsService->getReportCSV($start,$end,$type);
+                 return response($result, 200, [
+                     'Content-Type' => 'text/csv',
+                     'Content-Disposition' => 'attachment; filename="' . $type . '-report.csv"',
+                 ]);
+             }
+
+             $rows = $this->reportsService->getReportRows($start,$end,$type);
+             $path = $this->spreadsheetService->createXlsx([
+                 'Report' => $rows,
+             ]);
+
+             return response()
+                 ->download($path, $type . '-report.xlsx', [
+                     'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                 ])
+                 ->deleteFileAfterSend(true);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Report not found'], 404);
         } catch (Exception $e) {

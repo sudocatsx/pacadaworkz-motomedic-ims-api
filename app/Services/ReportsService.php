@@ -453,4 +453,24 @@ class ReportsService
                 return $this->reportCSVService->exportProfitAndLoss($data);
         }
     }
+
+    public function getReportRows($start, $end, $type): array
+    {
+        switch ($type) {
+            case 'sales':
+                return $this->reportCSVService->salesRows($this->getSalesReport($start, $end));
+            case 'purchase':
+                return $this->reportCSVService->purchaseRows($this->getPurchases($start, $end));
+            case 'inventory':
+                return $this->reportCSVService->inventoryRows($this->getInventory($start, $end));
+            case 'performance':
+                return $this->reportCSVService->performanceRows($this->getPerformance($start, $end));
+            case 'adjustments':
+                return $this->reportCSVService->adjustmentRows($this->getStockAdjustments($start, $end));
+            case 'profitloss':
+                return $this->reportCSVService->profitAndLossRows($this->getProfitLossReport($start, $end));
+            default:
+                return [];
+        }
+    }
 }

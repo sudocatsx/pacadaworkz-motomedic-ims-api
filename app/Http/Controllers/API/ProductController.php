@@ -10,8 +10,8 @@ use App\Http\Resources\ProductAttributeResource;
 use App\Http\Requests\Product\ProductRequest;
 use App\Http\Requests\Product\ProductUpdateRequest;
 use App\Http\Requests\Product\ProductAttributeRequest;
+use App\Services\SpreadsheetService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ProductController
@@ -19,10 +19,12 @@ class ProductController
 
 
     protected $productService;
+    protected $spreadsheetService;
 
-    public function __construct(ProductService $productService)
+    public function __construct(ProductService $productService, SpreadsheetService $spreadsheetService)
     {
         $this->productService = $productService;
+        $this->spreadsheetService = $spreadsheetService;
     }
 
     //get all products
@@ -256,39 +258,49 @@ class ProductController
         }
     }
 
-    //export as csv
-    public function export()
+    public function export(Request $request)
     {
         $products = $this->productService->getProductsForExport();
+        $rows = $this->productExportRows($products);
+        $format = strtolower($request->query('format', 'xlsx'));
 
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="products.csv"',
+        if ($format === 'csv') {
+            return response($this->spreadsheetService->rowsToCsv($rows), 200, [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="products.csv"',
+            ]);
+        }
+
+        $path = $this->spreadsheetService->createXlsx([
+            'Products' => $rows,
+        ]);
+
+        return response()
+            ->download($path, 'products.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])
+            ->deleteFileAfterSend(true);
+    }
+
+    private function productExportRows($products): array
+    {
+        $rows = [
+            ['ID', 'SKU', 'Name', 'Category', 'Brand', 'Unit Price', 'Cost Price', 'Description'],
         ];
 
-        $callback = function () use ($products) {
-            $file = fopen('php://output', 'w');
+        foreach ($products as $product) {
+            $rows[] = [
+                $product->id,
+                $product->sku,
+                $product->name,
+                $product->category ? $product->category->name : '',
+                $product->brand ? $product->brand->name : '',
+                $product->unit_price,
+                $product->cost_price,
+                $product->description,
+            ];
+        }
 
-            // Add CSV headers
-            fputcsv($file, ['ID', 'SKU', 'Name', 'Category', 'Brand', 'Unit Price', 'Cost Price', 'Description']);
-
-            // Add data rows
-            foreach ($products as $product) {
-                fputcsv($file, [
-                    $product->id,
-                    $product->sku,
-                    $product->name,
-                    $product->category ? $product->category->name : '',
-                    $product->brand ? $product->brand->name : '',
-                    $product->unit_price,
-                    $product->cost_price,
-                    $product->description,
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return new StreamedResponse($callback, 200, $headers);
+        return $rows;
     }
 }
