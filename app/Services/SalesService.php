@@ -58,10 +58,8 @@ class SalesService
     {
         return DB::transaction(function () use ($userId, $salesId) {
             $salesTransaction = SalesTransaction::with('sales_items')
-                ->where([
-                    'id' => $salesId,
-                    'user_id' => $userId,
-                ])->first();
+                ->where('id', $salesId)
+                ->first();
 
             if (! $salesTransaction) {
                 throw new SalesTransactionNotFoundException;
@@ -87,7 +85,7 @@ class SalesService
             $salesTransaction->save();
 
             $this->activityLogService->log(
-                module: 'Sales',
+                module: 'Transactions',
                 action: 'Void transaction',
                 description: "Voided sales transaction #{$salesTransaction->transaction_no}",
                 userId: $userId
@@ -101,10 +99,7 @@ class SalesService
     {
         return DB::transaction(function () use ($userId, $salesId, $data) {
             $salesTransaction = SalesTransaction::with('sales_items')
-                ->where([
-                    'id' => $salesId,
-                    'user_id' => $userId,
-                ])
+                ->where('id', $salesId)
                 ->first();
 
             if (! $salesTransaction) {
@@ -205,7 +200,7 @@ class SalesService
             $refundTypeDescription = ($refundType === 'full') ? 'Fully' : 'Partially';
 
             $this->activityLogService->log(
-                module: 'Sales',
+                module: 'Transactions',
                 action: 'Refund',
                 description: "{$refundTypeDescription} refunded {$refundAmount} for sales transaction #{$salesTransaction->transaction_no}",
                 userId: $userId

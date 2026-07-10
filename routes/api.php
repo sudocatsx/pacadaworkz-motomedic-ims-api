@@ -19,6 +19,7 @@ use App\Http\Controllers\API\RolePermissionController;
 use App\Http\Controllers\API\SalesController;
 use App\Http\Controllers\API\SupplierController;
 use App\Http\Controllers\API\SystemSettingController;
+use App\Http\Controllers\API\TransactionController;
 use App\Http\Controllers\API\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -195,6 +196,16 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{id}/void', [SalesController::class, 'void']);
                 Route::post('/{id}/refund', [SalesController::class, 'refund']);
                 Route::get('/{id}/receipt', [SalesController::class, 'receipt']);
+            });
+
+            Route::prefix('transactions')->middleware('modules:Transactions')->group(function () {
+                Route::get('/', [TransactionController::class, 'index'])->middleware('permissions:View');
+                Route::get('/daily-report', [TransactionController::class, 'dailyReport'])->middleware('permissions:View');
+                Route::get('/export', [TransactionController::class, 'export'])->middleware('permissions:Export');
+                Route::get('/{id}', [TransactionController::class, 'show'])->middleware('permissions:View');
+                Route::get('/{id}/receipt', [TransactionController::class, 'receipt'])->middleware('permissions:View');
+                Route::post('/{id}/refund', [TransactionController::class, 'refund'])->middleware('permissions:Refund');
+                Route::post('/{id}/void', [TransactionController::class, 'void'])->middleware('permissions:Void');
             });
 
             // Dashboard

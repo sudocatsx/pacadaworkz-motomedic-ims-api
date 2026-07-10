@@ -19,8 +19,11 @@ class SalesItemResource extends JsonResource
             'id' => $this->id,
             // 'sales_transactions_id' => $this->sales_transactions_id,
             'product_id' => $this->product_id,
-            'unit_price' => intval($this->unit_price),
+            'product_name' => $this->whenLoaded('product', fn () => $this->product?->name),
+            'unit_price' => (float) $this->unit_price,
             'quantity' => $this->quantity,
+            'quantity_returned' => (int) ($this->quantity_returned ?? 0),
+            'subtotal' => (float) ($this->subtotal ?? ($this->unit_price * $this->quantity)),
         ];
     }
 }

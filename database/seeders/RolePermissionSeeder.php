@@ -40,6 +40,7 @@ class RolePermissionSeeder extends Seeder
                 'Users' => ['View', 'Create', 'Edit', 'Delete'],
                 'Roles' => ['View', 'Create', 'Edit', 'Delete'],
                 'POS' => ['Access', 'Create Transaction'],
+                'Transactions' => ['View', 'Export', 'Refund', 'Void'],
                 'Reports' => ['View', 'Export'],
                 'Activity Logs' => ['View All', 'Export'],
                 'Settings' => ['View', 'Edit'],
@@ -49,6 +50,7 @@ class RolePermissionSeeder extends Seeder
                 'Products' => ['View'],
                 'Purchases' => ['View', 'Create'],
                 'POS' => ['Access', 'Create Transaction'],
+                'Transactions' => ['View'],
             ]),
         ];
 

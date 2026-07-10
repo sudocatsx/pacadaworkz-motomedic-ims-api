@@ -30,6 +30,8 @@ class PermissionSeeder extends Seeder
 
             'POS' => ['Access', 'Create Transaction'],
 
+            'Transactions' => ['View', 'Export', 'Refund', 'Void'],
+
             'Reports' => ['View', 'Export'],
 
             'Activity Logs' => ['View Own', 'View All', 'Export'],

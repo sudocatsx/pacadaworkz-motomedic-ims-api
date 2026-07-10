@@ -23,7 +23,25 @@ class SalesTransaction extends Model
         'payment_method',
         'amount_tendered',
         'change',
+        'status',
+        'refund_amount',
+        'refund_reason',
+        'refunded_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'subtotal' => 'decimal:2',
+            'tax' => 'decimal:2',
+            'discount' => 'decimal:2',
+            'total_amount' => 'decimal:2',
+            'amount_tendered' => 'decimal:2',
+            'change' => 'decimal:2',
+            'refund_amount' => 'decimal:2',
+            'refunded_at' => 'datetime',
+        ];
+    }
 
     // Entity Reletionship to the user
     public function user(): BelongsTo
