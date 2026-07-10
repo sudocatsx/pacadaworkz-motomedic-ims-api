@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Attribute;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class AttributesValueRequest extends FormRequest
 {
@@ -21,11 +22,14 @@ class AttributesValueRequest extends FormRequest
      */
     public function rules(): array
     {
-        
-        $id = $this->route('id');
         return [
-          //  'attribute_id' => 'required',
-            'value' => 'required|unique:attributes_values,value'
+            'value' => [
+                'required',
+                'max:100',
+                Rule::unique('attributes_values', 'value')
+                    ->ignore($this->route('valueId'))
+                    ->whereNull('deleted_at'),
+            ],
         ];
     }
 }

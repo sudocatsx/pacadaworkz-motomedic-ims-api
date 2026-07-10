@@ -25,6 +25,7 @@ class InventoryRequest extends FormRequest
             'product_id' => 'required|exists:products,id',
             'supplier_id' => 'required|exists:suppliers,id',
             'quantity' => 'required|integer|min:0',
+            'location' => 'nullable|string|max:255',
             'last_stock_in' => 'nullable|date',
         ];
 

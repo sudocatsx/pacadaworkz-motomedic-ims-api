@@ -65,8 +65,14 @@ class PosController extends Controller
                 'success' => true,
                 // 'data' => new CartItemResource($result),
                 'data' => CartItemResource::make($result),
+                // 'data' => $result,
                 'message' => 'Item added to cart successfully'
             ], 201);
+        } catch (InsufficientStockException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             \Log::error('POS Add to Cart Error: ' . $e->getMessage(), [
                 'user_id' => $userId,
@@ -96,6 +102,11 @@ class PosController extends Controller
                 'data' => CartItemResource::make($result),
                 'message' => 'Cart item updated successfully'
             ]);
+        } catch (InsufficientStockException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (CartItemNotFoundException $e) {
             return response()->json([
                 'success' => false,

@@ -1,3 +1,9 @@
+<IfModule mod_security.c>
+    # TINA-TRY NATING I-OFF ANG FIREWALL PANSAMANTALA
+    SecFilterEngine Off
+    SecFilterScanPOST Off
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
@@ -5,7 +11,7 @@
 
     RewriteEngine On
 
-    # Handle Authorization Header
+    # Handle Authorization Header (Importante para sa API Tokens)
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 

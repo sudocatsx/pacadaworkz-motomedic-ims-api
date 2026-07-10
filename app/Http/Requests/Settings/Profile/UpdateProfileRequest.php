@@ -32,6 +32,7 @@ class UpdateProfileRequest extends FormRequest
                 'email',
                 Rule::unique('users', 'email')->ignore($this->user()->id),
             ],
+            'contact_number' => ['nullable', 'string', 'max:30', 'regex:/^\d+$/'],
         ];
     }
 

@@ -32,7 +32,7 @@ class AttributesValue extends Model
      */
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class, 'product_attributes')
+        return $this->belongsToMany(Product::class, 'product_attributes', 'attribute_value_id', 'product_id')
             ->using(ProductAttribute::class)
             ->withTimestamps()
             ->withPivot('deleted_at');

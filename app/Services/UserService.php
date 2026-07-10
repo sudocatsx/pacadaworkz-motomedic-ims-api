@@ -7,9 +7,16 @@ use App\Exceptions\Auth\UserNotFoundException;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Services\ActivityLogService; // Added for activity logging
 
 class UserService
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
 
     public function getAllUsers(array $params)
     {
@@ -72,9 +79,20 @@ class UserService
         if ($user && $user->trashed()) {
             $user->restore();
             $user->update($fields);
+            $this->activityLogService->log(
+                'User',
+                'Restored and Updated',
+                "Restored and updated user: {$user->email} (ID: {$user->id})"
+            );
             return $user;
         }
-        return User::create($fields);
+        $user = User::create($fields);
+        $this->activityLogService->log(
+            'User',
+            'Created',
+            "Created new user: {$user->email} (ID: {$user->id})"
+        );
+        return $user;
     }
 
     public function updateUserById(int $id, array $fields)
@@ -88,6 +106,11 @@ class UserService
         //     unset($fields['deleted_at']);
         // }
         $user->update($fields);
+        $this->activityLogService->log(
+            'User',
+            'Updated',
+            "Updated user: {$user->email} (ID: {$user->id})"
+        );
         return $user;
     }
 
@@ -97,7 +120,13 @@ class UserService
         $user = User::find($id);
         if (!$user) throw new UserNotFoundException($id, 'id');
 
-        return $user->delete();
+        $user->delete();
+        $this->activityLogService->log(
+            'User',
+            'Deleted',
+            "Deleted user: {$user->email} (ID: {$user->id})"
+        );
+        return true;
     }
 
     public function resetPasswordById(int $id, array $fields)
@@ -114,11 +143,16 @@ class UserService
              * NOTE: set niyo yung USER_DEFAULT_PASSWORD sa .env
              *
              **/
-            $newPassword = $isDefaultPassword ? env('USER_DEFAULT_PASSWORD', 'Password@2026!') : $fields['new_password'];
+            $newPassword = $isDefaultPassword ? env('USER_DEFAULT_PASSWORD', 'Password@2025!') : $fields['new_password'];
 
             $user->update([
                 'password' => Hash::make($newPassword)
             ]);
+            $this->activityLogService->log(
+                'User',
+                'Password Reset',
+                "Password reset for user: {$user->email} (ID: {$user->id})"
+            );
             return true;
         }
 
@@ -141,6 +175,12 @@ class UserService
             'password' => Hash::make($newPassword)
         ]);
 
+        $this->activityLogService->log(
+            'User',
+            'Password Changed',
+            "Password changed for user: {$user->email} (ID: {$user->id})"
+        );
+
         return true;
     }
 
@@ -152,7 +192,11 @@ class UserService
         $user->update([
             'theme' => $fields['theme']
         ]);
-
+        $this->activityLogService->log(
+            'User',
+            'Theme Updated',
+            "Theme updated for user: {$user->email} (ID: {$user->id}) to {$fields['theme']}"
+        );
         return $user;
     }
 }

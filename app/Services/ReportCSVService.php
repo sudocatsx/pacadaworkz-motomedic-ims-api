@@ -6,6 +6,11 @@ class ReportCSVService
 {
     public function exportSales($data)
     {
+        return $this->arrayToCsv($this->salesRows($data));
+    }
+
+    public function salesRows($data): array
+    {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
         $csvData[] = ['Total Sales', $data['total_sales']];
@@ -17,10 +22,21 @@ class ReportCSVService
         foreach ($data['trend'] as $trend) {
             $csvData[] = [$trend->date, $trend->total];
         }
-        return $this->arrayToCsv($csvData);
+        $csvData[] = [];
+        $csvData[] = ['Sales by Staff'];
+        $csvData[] = ['Staff', 'Total Sales'];
+        foreach ($data['sales_by_staff'] as $staff => $total) {
+            $csvData[] = [$staff, $total];
+        }
+        return $csvData;
     }
 
     public function exportPurchase($data)
+    {
+        return $this->arrayToCsv($this->purchaseRows($data));
+    }
+
+    public function purchaseRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -33,10 +49,21 @@ class ReportCSVService
         foreach ($data['trend'] as $trend) {
             $csvData[] = [$trend->date, $trend->total];
         }
-        return $this->arrayToCsv($csvData);
+        $csvData[] = [];
+        $csvData[] = ['Purchase by Supplier'];
+        $csvData[] = ['Supplier', 'Total Purchases'];
+        foreach ($data['purchase_by_supplier'] as $supplier => $total) {
+            $csvData[] = [$supplier, $total];
+        }
+        return $csvData;
     }
 
     public function exportInventory($data)
+    {
+        return $this->arrayToCsv($this->inventoryRows($data));
+    }
+
+    public function inventoryRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -45,9 +72,33 @@ class ReportCSVService
         $csvData[] = ['Low Stock Products', $data['low_stock']];
         $csvData[] = ['Out of Stock Products', $data['out_of_stock']];
         $csvData[] = [];
+        $csvData[] = ['Stock Movement Summary'];
+        $csvData[] = ['Stock In Quantity', $data['movement_summary']['stock_in_quantity']];
+        $csvData[] = ['Stock Out Quantity', $data['movement_summary']['stock_out_quantity']];
+        $csvData[] = ['Net Stock Change', $data['movement_summary']['net_stock_change']];
+        $csvData[] = ['Movement Count', $data['movement_summary']['movement_count']];
+        $csvData[] = [];
+        $csvData[] = ['Movement by Source'];
+        $csvData[] = ['Source', 'Quantity', 'Count'];
+        foreach ($data['movement_by_source'] as $source => $movement) {
+            $csvData[] = [$source, $movement['quantity'], $movement['count']];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Low Stock Items'];
+        $csvData[] = ['Product', 'SKU', 'Current Stock', 'Reorder Point'];
+        foreach ($data['low_stock_items'] as $item) {
+            $csvData[] = [$item->name, $item->sku, $item->current_stock, $item->reorder_point];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Out of Stock Items'];
+        $csvData[] = ['Product', 'SKU', 'Reorder Point'];
+        foreach ($data['out_of_stock_items'] as $item) {
+            $csvData[] = [$item->name, $item->sku, $item->reorder_point];
+        }
+        $csvData[] = [];
         $csvData[] = ['Product Distribution by Category'];
         $csvData[] = ['Category', 'Total Products'];
-        foreach ($data['ditribution_category'] as $dist) {
+        foreach ($data['distribution_category'] as $dist) {
             $csvData[] = [$dist->name, $dist->total];
         }
         $csvData[] = [];
@@ -56,11 +107,43 @@ class ReportCSVService
         foreach ($data['inventory_value_category'] as $val) {
             $csvData[] = [$val->name, $val->inventory_value];
         }
+        $csvData[] = [];
+        $csvData[] = ['Top Moved Products'];
+        $csvData[] = ['Product', 'SKU', 'Stock In', 'Stock Out', 'Net Change', 'Total Moved'];
+        foreach ($data['top_moved_products'] as $product) {
+            $csvData[] = [
+                $product['name'],
+                $product['sku'],
+                $product['stock_in'],
+                $product['stock_out'],
+                $product['net_change'],
+                $product['total_moved'],
+            ];
+        }
+        $csvData[] = [];
+        $csvData[] = ['Recent Stock Movements'];
+        $csvData[] = ['Date', 'Product', 'SKU', 'Type', 'Quantity', 'Source', 'User'];
+        foreach ($data['recent_movements'] as $movement) {
+            $csvData[] = [
+                $movement->created_at,
+                $movement->product_name,
+                $movement->sku,
+                $movement->movement_type,
+                $movement->quantity,
+                $movement->reference_type,
+                $movement->user_name,
+            ];
+        }
 
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportPerformance($data)
+    {
+        return $this->arrayToCsv($this->performanceRows($data));
+    }
+
+    public function performanceRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Revenue by Category'];
@@ -74,10 +157,26 @@ class ReportCSVService
         foreach ($data['revenue_by_brand'] as $item) {
             $csvData[] = [$item->name, $item->total];
         }
-        return $this->arrayToCsv($csvData);
+        $csvData[] = [];
+        $csvData[] = ['Top Selling Products'];
+        $csvData[] = ['Product ID', 'Product', 'Quantity Sold', 'Revenue'];
+        foreach ($data['top_products'] as $item) {
+            $csvData[] = [
+                $item['product_id'],
+                $item['product_name'],
+                $item['quantity_sold'],
+                $item['revenue'],
+            ];
+        }
+        return $csvData;
     }
 
     public function exportAdjustments($data)
+    {
+        return $this->arrayToCsv($this->adjustmentRows($data));
+    }
+
+    public function adjustmentRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -89,10 +188,15 @@ class ReportCSVService
         foreach ($data['adjustments_by_reason'] as $reason) {
             $csvData[] = [$reason->reason, $reason->num_reasons];
         }
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
     public function exportProfitAndLoss($data)
+    {
+        return $this->arrayToCsv($this->profitAndLossRows($data));
+    }
+
+    public function profitAndLossRows($data): array
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
@@ -103,7 +207,7 @@ class ReportCSVService
         $csvData[] = ['Net Profit', $data['net_profit']];
         $csvData[] = ['Profit Margin (%)', $data['profit_margin']];
 
-        return $this->arrayToCsv($csvData);
+        return $csvData;
     }
 
 

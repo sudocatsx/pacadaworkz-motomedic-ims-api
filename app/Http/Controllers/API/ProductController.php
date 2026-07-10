@@ -8,274 +8,299 @@ use Illuminate\Http\Request;
 use App\Http\Resources\ProductResource;
 use App\Http\Resources\ProductAttributeResource;
 use App\Http\Requests\Product\ProductRequest;
+use App\Http\Requests\Product\ProductUpdateRequest;
 use App\Http\Requests\Product\ProductAttributeRequest;
+use App\Services\SpreadsheetService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+
 class ProductController
 {
 
 
     protected $productService;
+    protected $spreadsheetService;
 
-   public function __construct(ProductService $productService){
-      $this->productService = $productService;
-   }
+    public function __construct(ProductService $productService, SpreadsheetService $spreadsheetService)
+    {
+        $this->productService = $productService;
+        $this->spreadsheetService = $spreadsheetService;
+    }
 
-   //get all products
-   public function index(Request $request){
-     
-    try{
-    $search = $request->query('search',null);
-    $categoryId = $request->query('category_id', null);
-    $brandId = $request->query('brand_id', null);
-  
-     
-    $result = $this->productService->getAllProducts($search, $categoryId, $brandId);
-     return response()->json([
-        'success' => true,
-        'data' => ProductResource::collection($result),
-        'meta' => [
-        'current_page' => $result->currentPage(),
-        'per_page' => $result->perPage(),
-        'total' => $result->total(),
-         'last_page' => $result->lastPage()
-        ]
-     ]);
-     
-    }catch(\Exception $e){
-         return response()->json([
+    //get all products
+    public function index(Request $request)
+    {
+
+        try {
+            $search = $request->query('search', null);
+            $categoryId = $request->query('category_id', null);
+            $brandId = $request->query('brand_id', null);
+            $perPage = $request->query('per_page', 10);
+
+
+            $result = $this->productService->getAllProducts($search, $categoryId, $brandId, $perPage);
+            return response()->json([
+                'success' => true,
+                'data' => ProductResource::collection($result),
+                'meta' => [
+                    'current_page' => $result->currentPage(),
+                    'per_page' => $result->perPage(),
+                    'total' => $result->total(),
+                    'last_page' => $result->lastPage(),
+                    'total_pages' => $result->lastPage()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
-                'message' =>'An error occured',
+                'message' => 'An error occured',
             ], 500);
-
-
+        }
     }
 
 
-   }
-  
+    //get product by id
 
-   //get product by id
-
-   public function show($id){
+    public function show($id)
+    {
 
 
-      try{
-       
-         $result = $this->productService->getProductById($id);
+        try {
 
-         return response()->json([
-           'success'  => true,
-            'data' => new ProductResource($result)
-         ] 
-         );
+            $result = $this->productService->getProductById($id);
 
-      }catch(ModelNotFoundException $e){
-        return response()->json([
+            return response()->json(
+                [
+                    'success'  => true,
+                    'data' => new ProductResource($result)
+                ]
+            );
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
-      }catch(\Exception $e){
-                 return response()->json([
+        } catch (ConflictHttpException $e) {
+            return response()->json([
                 'success' => false,
-                'message' =>'An error occured',
-            ], 500);
-
-      }
-
-
-
-   }
-
-
-   //store product
-
-      public function store(ProductRequest $request){
-
-         
-      try{
-       
-         $result = $this->productService->create($request->validated());
-
-         return response()->json([
-           'success'  => true,
-            'data' => new ProductResource($result)
-         ] 
-         );
-
-      }catch(ModelNotFoundException $e){
-        return response()->json([
-                'success' => false,
-                'message' => 'Product not found'
-            ], 404);
-      }catch(\Exception $e){
-                 return response()->json([
+                'message' => $e->getMessage()
+            ], 409);
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'An error occured',
             ], 500);
-
-      }
-      }
-
+        }
+    }
 
 
-//update product
-      public function update(ProductRequest $request, $id){
-     
-              
-      try{
-         
+    //store product
 
-         $result = $this->productService->update($request->validated(),$id);
+    public function store(ProductRequest $request)
+    {
 
-         return response()->json([
-           'success'  => true,
-            'data' => new ProductResource($result)
-         ] 
-         );
 
-      }catch(ModelNotFoundException $e){
-        return response()->json([
+        try {
+
+            $result = $this->productService->create($request->validated());
+
+            return response()->json(
+                [
+                    'success'  => true,
+                    'data' => new ProductResource($result)
+                ]
+            );
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
-      }catch(\Exception $e){
-                 return response()->json([
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'An error occured',
             ], 500);
-
-      }
-
-      }
+        }
+    }
 
 
-//delete product 
-      
 
-public function destroy($id){
+    //update product
+    public function update(ProductUpdateRequest $request, $id)
+    {
 
-         
-      try{
-       
-         $result = $this->productService->delete($id);
 
-           return response()->json([
+        try {
+
+
+            $result = $this->productService->update($request->validated(), $id);
+
+            return response()->json(
+                [
+                    'success'  => true,
+                    'data' => new ProductResource($result)
+                ]
+            );
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found'
+            ], 404);
+        } catch (ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occured',
+            ], 500);
+        }
+    }
+
+
+    //delete product
+
+
+    public function destroy($id)
+    {
+
+
+        try {
+
+            $result = $this->productService->delete($id);
+
+            return response()->json([
                 'success' => true,
                 'data' => [
-                    'message' => 'Product deleted successfully']
-                ]);
-
-
-      }catch(ModelNotFoundException $e){
-        return response()->json([
+                    'message' => 'Product deleted successfully'
+                ]
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
-      }catch(\Exception $e){
-                 return response()->json([
+        } catch (ConflictHttpException $e) {
+            return response()->json([
                 'success' => false,
-                'message' =>'An error occured',
+                'message' => $e->getMessage()
+            ], 409);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occured',
             ], 500);
+        }
+    }
 
-      }
-}
+
+    //store attribute to the product
+    public function storeAttribute(ProductAttributeRequest $request, $id, $attributeId)
+    {
 
 
-//store attribute to the product
-    public function storeAttribute(ProductAttributeRequest $request,$id,$attributeId){
-        
+        try {
 
-         try{
-       
-         $result = $this->productService->createAttributeProduct($request->validated(),$id,$attributeId);
+            $result = $this->productService->createAttributeProduct($request->validated(), $id, $attributeId);
 
-           return response()->json([
+            return response()->json([
                 'success' => true,
                 'data' => [
                     'message' => new ProductAttributeResource($result)
-                    
+
                 ]
-                ]);
-
-
-      }catch(ModelNotFoundException $e){
-        return response()->json([
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'Attribute/Product not found'
             ], 404);
-      }catch(\Exception $e){
-                 return response()->json([
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
-                'message' =>'An error occured',
+                'message' => $e->getMessage(),
             ], 500);
-
-      }
-      
+        }
     }
 
 
 
-    //delete attribute to the product 
-        public function destroyAttributeProduct($id,$attributeProductId){
-                try{
-       
-         $result = $this->productService->deleteAttributeProduct($id,$attributeProductId);
+    //delete attribute to the product
+    public function destroyAttributeProduct($id, $attributeProductId)
+    {
+        try {
 
-           return response()->json([
+            $result = $this->productService->deleteAttributeProduct($id, $attributeProductId);
+
+            return response()->json([
                 'success' => true,
                 'data' => [
-                    'message' => 'Product deleted successfully']
-                ]);
-
-
-      }catch(ModelNotFoundException $e){
-        return response()->json([
+                    'message' => 'Product deleted successfully'
+                ]
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found'
             ], 404);
-      }catch(\Exception $e){
-                 return response()->json([
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
-                'message' =>'An error occured',
+                'message' => 'An error occured',
             ], 500);
+        }
+    }
 
-      }
+    public function export(Request $request)
+    {
+        $products = $this->productService->getProductsForExport();
+        $rows = $this->productExportRows($products);
+        $format = strtolower($request->query('format', 'xlsx'));
+
+        if ($format === 'csv') {
+            return response($this->spreadsheetService->rowsToCsv($rows), 200, [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="products.csv"',
+            ]);
         }
 
-        //export as csv
-    public function export(){
-        $products = $this->productService->getProductsForExport();
+        $path = $this->spreadsheetService->createXlsx([
+            'Products' => $rows,
+        ]);
 
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="products.csv"',
+        return response()
+            ->download($path, 'products.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])
+            ->deleteFileAfterSend(true);
+    }
+
+    private function productExportRows($products): array
+    {
+        $rows = [
+            ['ID', 'SKU', 'Name', 'Category', 'Brand', 'Unit Price', 'Cost Price', 'Description'],
         ];
 
-        $callback = function() use ($products) {
-            $file = fopen('php://output', 'w');
-            
-            // Add CSV headers
-            fputcsv($file, ['ID', 'SKU', 'Name', 'Category', 'Brand', 'Unit Price', 'Cost Price', 'Description']);
+        foreach ($products as $product) {
+            $rows[] = [
+                $product->id,
+                $product->sku,
+                $product->name,
+                $product->category ? $product->category->name : '',
+                $product->brand ? $product->brand->name : '',
+                $product->unit_price,
+                $product->cost_price,
+                $product->description,
+            ];
+        }
 
-            // Add data rows
-            foreach ($products as $product) {
-                fputcsv($file, [
-                    $product->id,
-                    $product->sku,
-                    $product->name,
-                    $product->category ? $product->category->name : '',
-                    $product->brand ? $product->brand->name : '',
-                    $product->unit_price,
-                    $product->cost_price,
-                    $product->description,
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return new StreamedResponse($callback, 200, $headers);
-   }
-       
+        return $rows;
+    }
 }

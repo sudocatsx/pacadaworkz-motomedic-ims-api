@@ -4,6 +4,13 @@ use App\Models\Inventory;
 
 class InventoryService
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
+
     public function getAllInventory($search = null)
     {
         $query = Inventory::with(['product.brand', 'product.category']);
@@ -29,7 +36,9 @@ class InventoryService
 
     public function createInventory(array $data)
     {
-        return Inventory::create($data);
+        $inventory = Inventory::create($data);
+        $this->activityLogService->log('Inventory', 'Create', "Created inventory item #{$inventory->id}");
+        return $inventory;
     }
 
     public function updateInventory(array $data, $id)
@@ -37,12 +46,14 @@ class InventoryService
         $inventory = Inventory::findOrFail($id);
         $inventory->update($data);
 
+        $this->activityLogService->log('Inventory', 'Update', "Updated inventory item #{$inventory->id}");
         return $inventory;
     }
 
     public function deleteInventory($id)
     {
         $inventory = Inventory::findOrFail($id);
+        $this->activityLogService->log('Inventory', 'Delete', "Deleted inventory item #{$inventory->id}");
         $inventory->delete();
 
         return true;

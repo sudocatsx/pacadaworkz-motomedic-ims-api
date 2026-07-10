@@ -1,37 +1,57 @@
 <?php
 namespace App\Services;
 use App\Models\Category;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class CategoryService{
 
+    protected $activityLogService;
 
- public function getAllCategories($search = null){
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
+
+
+ public function getAllCategories($search = null, $perPage = 10){
 
       $query = Category::query();
-      
+
       if($search)
       {
-        $query->where('name','Ilike',"%{$search}%")->orWhere('description','Ilike',"%{$search}%");
+        $search = strtolower($search);
+        $query->where(function ($query) use ($search) {
+            $query->whereRaw('LOWER(name) LIKE ?', ["%{$search}%"])
+                ->orWhereRaw('LOWER(description) LIKE ?', ["%{$search}%"]);
+        });
       }
-    
-     return $query->paginate(10)->withQueryString();
+
+     return $query->withCount('products')->paginate($perPage)->withQueryString();
  }
 
 
- public function create(array $category){
-     
-    return Category::create([
-        'name' => $category['name'],
-        'description' => $category['description']
+ public function create(array $categoryData){
+
+    $category = Category::create([
+        'name' => $categoryData['name'],
+        'description' => $categoryData['description']
     ]);
-   
+
+    $this->activityLogService->log(
+        module: 'Category',
+        action: 'Create',
+        description: "Category created: {$category->name}",
+        userId: auth()->id()
+    );
+
+    return $category;
  }
 
 
 
  public function getCategoryById($id)
  {
-    
+
      $category = Category::findOrFail($id);
 
      return $category;
@@ -42,14 +62,22 @@ class CategoryService{
 
  public function update($id, array $update)
  {
-      
+
     $category = Category::findOrfail($id);
-    
+    $oldName = $category->name;
+
     $category->update([
        'name' => $update['name'],
        'description' => $update['description']
     ]);
-     
+
+    $this->activityLogService->log(
+        module: 'Category',
+        action: 'Update',
+        description: "Category updated from '{$oldName}' to '{$category->name}'",
+        userId: auth()->id()
+    );
+
      return $category;
 
  }
@@ -57,10 +85,24 @@ class CategoryService{
 
 
  public function delete($id){
-    
+
     $category = Category::findOrFail($id);
-    
-   return $category->delete();
+    $categoryName = $category->name;
+
+    if ($category->products()->exists()) {
+        throw new ConflictHttpException('Category cannot be deleted while products are assigned to it.');
+    }
+
+    $category->delete();
+
+    $this->activityLogService->log(
+        module: 'Category',
+        action: 'Delete',
+        description: "Category deleted: {$categoryName}",
+        userId: auth()->id()
+    );
+
+   return true;
 
  }
 

@@ -6,6 +6,7 @@ use App\Services\RoleService;
 use App\Http\Controllers\API\Controller;
 use App\Http\Resources\RoleResource;
 use App\Http\Requests\Role\RoleRequest;
+use App\Http\Requests\Role\UpdateRoleRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class RoleController extends Controller
@@ -74,7 +75,7 @@ class RoleController extends Controller
         }
     }
 
-    public function update(RoleRequest $request, $id)
+    public function update(UpdateRoleRequest $request, $id)
     {
         try {
             $validated = $request->validated();

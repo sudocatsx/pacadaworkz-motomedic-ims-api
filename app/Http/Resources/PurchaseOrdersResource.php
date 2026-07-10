@@ -18,14 +18,18 @@ class PurchaseOrdersResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'supplier' => $this->supplier->name,
-            'user' => $this->user->name,
+            'supplier_id' => $this->supplier_id,
+            'supplier_name' => $this->supplier->name ?? null,
+            'user_id' => $this->user_id,
+            'user_name' => $this->user->name ?? null,
             'order_date' => $this->order_date,
             'expected_delivery' => $this->expected_delivery,
-            'total_amount' => $this->total_amount,
+            'total_amount' => floatval($this->total_amount),
             'status' => $this->status,
-             'notes' => $this->notes
-
+            'notes' => $this->notes,
+            'items' => PurchaseItemResource::collection($this->whenLoaded('purchase_items')),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

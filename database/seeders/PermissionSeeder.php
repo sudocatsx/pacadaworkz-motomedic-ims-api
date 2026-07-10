@@ -33,7 +33,7 @@ class PermissionSeeder extends Seeder
 
             'Reports' => ['View', 'Export'],
 
-            'Activity Logs' => ['View Own', 'View All'],
+            'Activity Logs' => ['View Own', 'View All', 'Export'],
 
            
             'Settings' => ['View', 'Edit'],
@@ -52,6 +52,14 @@ class PermissionSeeder extends Seeder
             }
         }
 
-        DB::table('permissions')->insert($permissions);
+        foreach ($permissions as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                [
+                    'name' => $permission['name'],
+                    'module' => $permission['module'],
+                ],
+                $permission
+            );
+        }
     }
 }

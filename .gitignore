@@ -40,3 +40,7 @@ Homestead.yaml
 
 # GEMINI
 GEMINI.md
+
+# Documentation files to ignore
+docs/activity_log_middleware_review.md
+docs/activity_log_tasks.md

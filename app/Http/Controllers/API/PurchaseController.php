@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Exceptions\Purchase\PurchaseReceiveException;
+use App\Exceptions\Purchase\PurchaseUpdateException;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\API\Controller;
 use App\Services\PurchaseService;
 use App\Http\Resources\PurchaseOrdersResource;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
-use App\Http\Requests\Product\ProductAttributeRequest;
 use App\Http\Requests\Purchase\PurchaseOrdersRequest;
 use Exception;
 
@@ -19,26 +21,37 @@ class PurchaseController extends Controller
     {
         $this->purchaseService = $purchaseService;
     }
- 
 
-    // show all purchase
+    /**
+     * Display a listing of the purchase orders.
+     */
     public function index(Request $request)
     {
         try {
-             $search = $request->query('search', null);
+            $search = $request->query('search', null);
             $result = $this->purchaseService->getPurchases($search);
-             
+
             return response()->json([
                 'success' => true,
-                 'data' => PurchaseOrdersResource::collection($result)
+                'data' => PurchaseOrdersResource::collection($result),
+                'meta' => [
+                    'current_page' => $result->currentPage(),
+                    'per_page' => $result->perPage(),
+                    'total' => $result->total(),
+                    'total_pages' => $result->lastPage(),
+                ]
             ]);
-
         } catch (Exception $e) {
-            return response()->json(['success' => false, 'error' => 'An error occured',], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred'
+            ], 500);
         }
     }
 
-    //store new Purchase
+    /**
+     * Store a newly created purchase order in storage.
+     */
     public function store(PurchaseOrdersRequest $request)
     {
         try {
@@ -48,28 +61,41 @@ class PurchaseController extends Controller
                 'data' => new PurchaseOrdersResource($result)
             ]);
         } catch (Exception $e) {
-            return response()->json(['success' => false, 'error' => 'An error occured',], 500);
+            return response()->json([
+                'success' => false,
+                // 'message' => $e->getMessage()
+                'message' => 'An error occurred'
+            ], 500);
         }
     }
- // get by id 
+
+    /**
+     * Display the specified purchase order.
+     */
     public function show($id)
     {
         try {
-            
             $result = $this->purchaseService->findPurchase($id);
-             
-            return [
+            return response()->json([
                 'success' => true,
                 'data' => new PurchaseOrdersResource($result)
-            ];
-
+            ]);
         } catch (ModelNotFoundException $e) {
-            return response()->json(['success' => false, 'error' => 'Purchase order not found.'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase order not found.'
+            ], 404);
         } catch (Exception $e) {
-            return response()->json(['success' => false, 'error' => 'An error occured',], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred'
+            ], 500);
         }
     }
-   //update purchase order
+
+    /**
+     * Update the specified purchase order in storage.
+     */
     public function update(PurchaseOrdersRequest $request, $id)
     {
         try {
@@ -78,28 +104,82 @@ class PurchaseController extends Controller
                 'success' => true,
                 'data' => new PurchaseOrdersResource($result)
             ]);
+        } catch (PurchaseUpdateException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], $e->getCode());
         } catch (ModelNotFoundException $e) {
-            return response()->json(['success' => false, 'error' => 'Purchase order not found.'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase order not found.'
+            ], 404);
         } catch (Exception $e) {
-            return response()->json(['success' => false, 'error' => 'An error occured',], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred'
+            ], 500);
         }
     }
 
-    //Delete purchase
+    /**
+     * Remove the specified purchase order from storage.
+     */
     public function destroy($id)
     {
         try {
-            $result = $this->purchaseService->deletePurchase($id);
-             return response()->json([
+            $this->purchaseService->deletePurchase($id);
+            return response()->json([
                 'success' => true,
                 'data' => [
-                    'message' => 'Product deleted successfully']
+                    'message' => 'Purchase order deleted successfully'
                 ]
-            );
+            ]);
+        } catch (PurchaseUpdateException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], $e->getCode());
         } catch (ModelNotFoundException $e) {
-            return response()->json(['success' => false, 'error' => 'Purchase order not found.'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase order not found.'
+            ], 404);
         } catch (Exception $e) {
-            return response()->json(['success' => false, 'error' => 'An error occured',], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark purchase order as received.
+     */
+    public function receive($id)
+    {
+        $userId = Auth::id();
+        try {
+            $result = $this->purchaseService->receivePurchase($id, $userId);
+            return response()->json([
+                'success' => true,
+                'data' => new PurchaseOrdersResource($result)
+            ]);
+        } catch (PurchaseReceiveException $e) {
+            return response()->json([
+                'success' => false,
+                // 'message' => $e->getMessage()
+            ], $e->getCode());
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase order not found.'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred'
+            ], 500);
         }
     }
 }

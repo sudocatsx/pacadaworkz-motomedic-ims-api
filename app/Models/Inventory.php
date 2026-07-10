@@ -26,6 +26,7 @@ class Inventory extends Model
         'product_id',
         'supplier_id',
         'quantity',
+        'location',
         'last_stock_in',
     ];
 

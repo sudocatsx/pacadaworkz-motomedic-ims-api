@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Attribute;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class AttributeRequest extends FormRequest
 {
@@ -22,7 +23,14 @@ class AttributeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|max:50'
+            'name' => [
+                'required',
+                'max:50',
+                Rule::unique('attributes', 'name')
+                    ->ignore($this->route('id'))
+                    ->whereNull('deleted_at'),
+            ],
+            'description' => 'sometimes|nullable|string|max:500',
         ];
     }
 }

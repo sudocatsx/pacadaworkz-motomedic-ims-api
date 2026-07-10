@@ -10,6 +10,9 @@ class ProductAttribute extends Pivot
     use SoftDeletes;
     
     //
+
+
+    protected $table = 'product_attributes';
  
     protected $dates = ['deleted_at'];
 

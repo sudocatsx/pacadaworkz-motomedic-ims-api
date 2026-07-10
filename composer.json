@@ -56,7 +56,8 @@
         ],
         "dev-wsl": [
             "Composer\\Config::disableProcessTimeout",
-            "php artisan serve --host=0.0.0.0 --port=8000"
+            "npx concurrently -c \"#93c5fd,#c4b5fd\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" --names='server,queue'"
+
         ],
         "test": [
             "@php artisan config:clear --ansi",
@@ -87,7 +88,7 @@
         }
     },
     "config": {
-        "optimize-autoloader": true,
+        "optimize-autoloader": false,
         "preferred-install": "dist",
         "sort-packages": true,
         "allow-plugins": {

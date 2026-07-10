@@ -15,6 +15,7 @@ class SalesItem extends Model
         'sales_transactions_id',
         'product_id',
         'quantity',
+        'quantity_returned',
         'unit_price',
     ];
 

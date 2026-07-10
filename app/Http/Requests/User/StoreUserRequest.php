@@ -33,9 +33,10 @@ class StoreUserRequest extends FormRequest
                 Rule::unique('users')->withoutTrashed()
             ],
             // 'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
+            'password' => 'required_if:is_default_password,false|nullable|string|min:6',
             'first_name' => 'required|string|max:50',
             'last_name' => 'required|string|max:50',
+            'contact_number' => ['nullable', 'string', 'max:30', 'regex:/^\d+$/'],
             // TODO: is_default_password
             'is_default_password' => 'required|boolean'
         ];

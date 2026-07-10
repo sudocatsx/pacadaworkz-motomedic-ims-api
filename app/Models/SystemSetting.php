@@ -11,15 +11,8 @@ class SystemSetting extends Model
     // use SoftDeletes;
     // fillable is for mass assigment (allowed na ifill up)
     protected $fillable = [
-        'user_id',
         'setting_key',
         'setting_value',
         'description'
     ];
-
-    //Entity relationship to user
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
 }

@@ -3,12 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseItem extends Model
 {
-    use SoftDeletes;
+    public $timestamps = false;
     
     //
 
@@ -28,9 +27,9 @@ class PurchaseItem extends Model
     }
 
     //Entity Relationship to the product
-      public function products(): BelongsTo
+      public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class, 'product_id');
     }
 
 }

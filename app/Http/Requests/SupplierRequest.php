@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SupplierRequest extends FormRequest
 {
@@ -22,17 +23,31 @@ class SupplierRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:200',
+                Rule::unique('suppliers', 'name')
+                    ->ignore($this->route('id'))
+                    ->whereNull('deleted_at'),
+            ],
             'contact_person' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
+            'email' => [
+                'nullable',
+                'email',
+                'max:100',
+                Rule::unique('suppliers', 'email')
+                    ->ignore($this->route('id'))
+                    ->whereNull('deleted_at'),
+            ],
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
         ];
 
         if ($this->isMethod('patch')) {
-            $rules = array_map(function ($rule) {
-                return 'sometimes|' . $rule;
-            }, $rules);
+            $rules = collect($rules)->map(function ($rule) {
+                return is_array($rule) ? ['sometimes', ...$rule] : 'sometimes|' . $rule;
+            })->all();
         }
 
         return $rules;

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Services\BrandService;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class BrandController
 {
@@ -26,14 +27,24 @@ class BrandController
         $perPage = $request->query('per_page', 10);
         $result = $this->brandService->getAllBrands($search, $perPage);
          
-        return BrandResource::collection($result);
+        return response()->json([
+            'success' => true,
+            'data' => BrandResource::collection($result),
+            'meta' => [
+                'current_page' => $result->currentPage(),
+                'per_page' => $result->perPage(),
+                'total' => $result->total(),
+                'last_page' => $result->lastPage(),
+                'total_pages' => $result->lastPage(),
+            ],
+        ]);
         
 
     }catch(\Exception $e){
           return response()->json([
                 'success' => false,
                 'message' => 'An error is occurred'
-            ], 401);
+            ], 500);
     }
    }
 
@@ -136,6 +147,11 @@ class BrandController
                 'success' => false,
                 'message' => 'Brand not found.'
             ], 404);   
+        }catch(ConflictHttpException $e){
+              return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 409);
         }catch(\Exception $e){
                return response()->json([
                 'success' => false,

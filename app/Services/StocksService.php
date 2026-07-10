@@ -7,9 +7,17 @@ use App\Models\StockMovement;
 use App\Models\Inventory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Services\ActivityLogService;
+use Illuminate\Support\Facades\Auth;
 
 class StocksService
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
    
     //show stock adjustments service
   public function showStockAdjustments(?string $search = null, int $perPage = 15): LengthAwarePaginator
@@ -192,6 +200,14 @@ class StocksService
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            // Log activity after successful transaction
+            $this->activityLogService->log(
+                'Stock Adjustment',
+                'created',
+                'Stock Adjustment created (ID: ' . $adjustment->id . ', Reason: ' . $adjustment->reason . ', Quantity: ' . $data['quantity'] . ')',
+                Auth::id()
+            );
+
             return $adjustment;
         });
     }
@@ -200,7 +216,16 @@ class StocksService
     public function updateStockAdjustment(int $id, array $data): StockAdjustment
     {
         $adjustment = StockAdjustment::findOrFail($id);
+        $oldReason = $adjustment->reason; // Capture old reason for log description
         $adjustment->update($data);
+
+        $this->activityLogService->log(
+            'Stock Adjustment',
+            'updated',
+            'Stock Adjustment ID: ' . $adjustment->id . ' updated. Old reason: ' . $oldReason . ', New reason: ' . ($data['reason'] ?? $oldReason),
+            Auth::id()
+        );
+
         return $adjustment;
     }
 }

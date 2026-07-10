@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
         $users = [
             [
                 "role_id" => 1,
-                "name" => "Super admin",
+                "name" => "Superadmin Domdom",
                 "email" => "domdomkenneth23@gmail.com",
                 "password" => Hash::make("superadmin"),
                 "first_name" => "Super",
@@ -24,15 +24,15 @@ class UserSeeder extends Seeder
             ],
             [
                 "role_id" => 2,
-                "name" => "Admin admin",
-                "email" => "ashermanit48@gmail.com",
+                "name" => "Admin Asher",
+                "email" => "asherjohn48@gmail.com",
                 "password" => Hash::make("admin"),
                 "first_name" => "Admin",
                 "last_name" => "admin"
             ],
             [
                 "role_id" => 3,
-                "name" => "Staff staff",
+                "name" => "Staff Sharks",
                 "email" => "sharkspin@gmail.com",
                 "password" => Hash::make("staff"),
                 "first_name" => "Staff",
@@ -40,9 +40,9 @@ class UserSeeder extends Seeder
             ],
             [
                 "role_id" => 2,
-                "name" => "Admin Something",
+                "name" => "Admin Gab",
                 "email" => "johngabrielleofiangga@gmail.com",
-                "password" => Hash::make("adminsecond"),
+                "password" => Hash::make("admin"),
                 "first_name" => "admin",
                 "last_name" => "second"
             ],

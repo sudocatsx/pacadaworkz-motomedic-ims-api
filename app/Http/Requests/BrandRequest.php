@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class BrandRequest extends FormRequest
 {
@@ -22,8 +23,14 @@ class BrandRequest extends FormRequest
     public function rules(): array
     {
         return [
-               'name' => 'required|max:100',
-               'description' =>'sometimes'
+            'name' => [
+                'required',
+                'max:50',
+                Rule::unique('brands', 'name')
+                    ->ignore($this->route('id'))
+                    ->whereNull('deleted_at'),
+            ],
+            'description' => 'sometimes|nullable',
         ];
     }
 }
