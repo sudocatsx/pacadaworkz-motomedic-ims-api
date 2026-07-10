@@ -95,6 +95,40 @@ test('product creation stores opening stock and records an opening movement', fu
     ]);
 });
 
+test('product SKU generation uses category and brand prefixes with an atomic sequence', function () {
+    $category = Category::create(['name' => 'Brake Pads']);
+    $brand = Brand::create(['name' => 'Honda']);
+    $otherBrand = Brand::create(['name' => 'Yamaha']);
+    $actor = productsActor();
+
+    $this->actingAs($actor, 'api')->postJson('/api/v1/products/sku/generate', [
+        'category_id' => $category->id,
+        'brand_id' => $brand->id,
+    ])->assertOk()->assertJsonPath('data.sku', 'BRA-HON-0001');
+
+    $this->actingAs($actor, 'api')->postJson('/api/v1/products/sku/generate', [
+        'category_id' => $category->id,
+        'brand_id' => $brand->id,
+    ])->assertOk()->assertJsonPath('data.sku', 'BRA-HON-0002');
+
+    $this->actingAs($actor, 'api')->postJson('/api/v1/products/sku/generate', [
+        'category_id' => $category->id,
+        'brand_id' => $otherBrand->id,
+    ])->assertOk()->assertJsonPath('data.sku', 'BRA-YAM-0001');
+});
+
+test('product SKU generation requires product create permission', function () {
+    $product = productsFixture();
+    $role = Role::create(['role_name' => 'product-viewer', 'description' => 'Product Viewer']);
+    $role->permissions()->sync(Permission::where('module', 'Products')->where('name', 'View')->pluck('id'));
+    $viewer = User::factory()->create(['role_id' => $role->id]);
+
+    $this->actingAs($viewer, 'api')->postJson('/api/v1/products/sku/generate', [
+        'category_id' => $product->category_id,
+        'brand_id' => $product->brand_id,
+    ])->assertForbidden();
+});
+
 test('product edit cannot overwrite inventory quantity', function () {
     $product = productsFixture([], ['quantity' => 9]);
 

@@ -11,6 +11,7 @@ use App\Http\Resources\ProductResource;
 use App\Http\Resources\StockAdjustmentResource;
 use App\Http\Resources\StockMovementResource;
 use App\Services\ProductService;
+use App\Services\ProductSkuService;
 use App\Services\SpreadsheetService;
 use App\Services\StocksService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -29,9 +30,25 @@ class ProductController
         ProductService $productService,
         SpreadsheetService $spreadsheetService,
         private readonly StocksService $stocksService,
+        private readonly ProductSkuService $productSkuService,
     ) {
         $this->productService = $productService;
         $this->spreadsheetService = $spreadsheetService;
+    }
+
+    public function generateSku(Request $request)
+    {
+        $data = $request->validate([
+            'category_id' => 'required|integer|exists:categories,id',
+            'brand_id' => 'required|integer|exists:brands,id',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'sku' => $this->productSkuService->generate($data['category_id'], $data['brand_id']),
+            ],
+        ]);
     }
 
     // get all products

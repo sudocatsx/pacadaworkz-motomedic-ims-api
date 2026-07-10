@@ -132,6 +132,7 @@ Route::prefix('v1')->group(function () {
             Route::middleware('modules:Products')->prefix('products')->group(function () {
                 Route::get('/', [ProductController::class, 'index'])->middleware('permissions:Products.View');
                 Route::get('/export', [ProductController::class, 'export'])->middleware('permissions:Products.Export');
+                Route::post('/sku/generate', [ProductController::class, 'generateSku'])->middleware('permissions:Products.Create');
                 Route::get('/{id}/stock-movements', [ProductController::class, 'movements'])->middleware('permissions:Products.View');
                 Route::post('/{id}/stock-adjustments', [ProductController::class, 'adjustStock'])->middleware('permissions:Products.Adjust Stock');
                 Route::get('/{id}', [ProductController::class, 'show'])->middleware('permissions:Products.View');
