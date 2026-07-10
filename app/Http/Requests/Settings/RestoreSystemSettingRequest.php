@@ -26,7 +26,7 @@ class RestoreSystemSettingRequest extends FormRequest
                 'required',
                 'file',
                 'mimes:sql,gz,tar,dump,bin', // Extension check
-                'max:' . (int) config('backup.max_upload_kb', 512000), // Configurable limit (default 500MB)
+                'max:'.(int) config('backup.max_upload_kb', 512000), // Configurable limit (default 500MB)
                 function ($attribute, $value, $fail) {
                     // Open file to read magic bytes/header
                     $handle = fopen($value->getRealPath(), 'rb');
@@ -41,7 +41,7 @@ class RestoreSystemSettingRequest extends FormRequest
 
                     fclose($handle);
 
-                    if (!$isCustomFormat && !$isSqlText) {
+                    if (! $isCustomFormat && ! $isSqlText) {
                         $fail('The uploaded file does not appear to be a valid PostgreSQL backup.');
                     }
                 },

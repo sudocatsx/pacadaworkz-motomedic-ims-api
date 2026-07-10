@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests\User;
 
-use Illuminate\Validation\Rule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class StoreUserRequest extends FormRequest
 {
@@ -30,7 +30,7 @@ class StoreUserRequest extends FormRequest
             'email' => [
                 'required',
                 'email',
-                Rule::unique('users')->withoutTrashed()
+                Rule::unique('users')->withoutTrashed(),
             ],
             // 'email' => 'required|email|unique:users,email',
             'password' => 'required_if:is_default_password,false|nullable|string|min:6',
@@ -38,7 +38,7 @@ class StoreUserRequest extends FormRequest
             'last_name' => 'required|string|max:50',
             'contact_number' => ['nullable', 'string', 'max:30', 'regex:/^\d+$/'],
             // TODO: is_default_password
-            'is_default_password' => 'required|boolean'
+            'is_default_password' => 'required|boolean',
         ];
     }
 
@@ -47,7 +47,7 @@ class StoreUserRequest extends FormRequest
         throw new HttpResponseException(response()->json([
             'success' => false,
             'message' => 'Validation errors',
-            'data' => $validator->errors()
+            'data' => $validator->errors(),
         ], 422));
     }
 }

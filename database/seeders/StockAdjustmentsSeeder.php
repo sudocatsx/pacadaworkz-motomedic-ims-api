@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\StockAdjustment;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class StockAdjustmentsSeeder extends Seeder
 {
@@ -14,7 +14,7 @@ class StockAdjustmentsSeeder extends Seeder
      */
     public function run(): void
     {
- 
+
         if (User::count() == 0) {
             User::factory()->create();
         }

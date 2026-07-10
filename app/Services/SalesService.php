@@ -2,20 +2,17 @@
 
 namespace App\Services;
 
-use App\Exceptions\Sales\SalesTransactionNotFoundException;
 use App\Exceptions\Sales\InvalidRefundSalesTransactionException;
+use App\Exceptions\Sales\SalesTransactionNotFoundException;
 use App\Models\Inventory;
 use App\Models\SalesTransaction;
+use App\Models\StockMovement;
 use App\Models\SystemSetting;
 use Illuminate\Support\Facades\DB;
 
-use App\Models\StockMovement;
-
 class SalesService
 {
-    public function __construct(private ActivityLogService $activityLogService)
-    {
-    }
+    public function __construct(private ActivityLogService $activityLogService) {}
 
     public function getAllSales($search = null, $filters = [])
     {
@@ -25,7 +22,7 @@ class SalesService
             $query->where('transaction_no', 'LIKE', "%{$search}%");
         }
 
-        if (!empty($filters)) {
+        if (! empty($filters)) {
             if (isset($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -50,8 +47,9 @@ class SalesService
     {
         $salesTransaction = SalesTransaction::with(['user', 'sales_items.product'])->find($id);
 
-        if (!$salesTransaction)
-            throw new SalesTransactionNotFoundException();
+        if (! $salesTransaction) {
+            throw new SalesTransactionNotFoundException;
+        }
 
         return $salesTransaction;
     }
@@ -62,11 +60,11 @@ class SalesService
             $salesTransaction = SalesTransaction::with('sales_items')
                 ->where([
                     'id' => $salesId,
-                    'user_id' => $userId
+                    'user_id' => $userId,
                 ])->first();
 
-            if (!$salesTransaction) {
-                throw new SalesTransactionNotFoundException();
+            if (! $salesTransaction) {
+                throw new SalesTransactionNotFoundException;
             }
 
             if ($salesTransaction->status === 'voided') {
@@ -74,7 +72,7 @@ class SalesService
             }
 
             if (in_array($salesTransaction->status, ['refunded', 'partially_refunded'], true)) {
-                throw new InvalidRefundSalesTransactionException();
+                throw new InvalidRefundSalesTransactionException;
             }
 
             // Restore stock
@@ -105,12 +103,12 @@ class SalesService
             $salesTransaction = SalesTransaction::with('sales_items')
                 ->where([
                     'id' => $salesId,
-                    'user_id' => $userId
+                    'user_id' => $userId,
                 ])
                 ->first();
 
-            if (!$salesTransaction) {
-                throw new SalesTransactionNotFoundException();
+            if (! $salesTransaction) {
+                throw new SalesTransactionNotFoundException;
             }
 
             if ($salesTransaction->status === 'voided') {
@@ -143,7 +141,7 @@ class SalesService
                             'quantity' => $remainingQty,
                             'reference_type' => 'return',
                             'reference_id' => $salesTransaction->id,
-                            'notes' => 'Full Refund: ' . $mainReason
+                            'notes' => 'Full Refund: '.$mainReason,
                         ]);
 
                         $item->quantity_returned = $item->quantity;
@@ -157,7 +155,7 @@ class SalesService
                 foreach ($data['refund_items'] as $refundItem) {
                     $item = $salesTransaction->sales_items->where('id', $refundItem['sales_item_id'])->first();
 
-                    if (!$item) {
+                    if (! $item) {
                         throw new InvalidRefundSalesTransactionException("Invalid sales item ID: {$refundItem['sales_item_id']} does not belong to this transaction.");
                     }
 
@@ -182,7 +180,7 @@ class SalesService
                         'quantity' => $qtyToRefund,
                         'reference_type' => 'return',
                         'reference_id' => $salesTransaction->id,
-                        'notes' => 'Partial Refund: ' . ($refundItem['reason'] ?? $mainReason)
+                        'notes' => 'Partial Refund: '.($refundItem['reason'] ?? $mainReason),
                     ]);
 
                     $item->quantity_returned += $qtyToRefund;
@@ -221,8 +219,8 @@ class SalesService
     {
         $transaction = SalesTransaction::with(['user', 'sales_items.product'])->find($id);
 
-        if (!$transaction) {
-            throw new SalesTransactionNotFoundException();
+        if (! $transaction) {
+            throw new SalesTransactionNotFoundException;
         }
 
         // Fetch System Settings
@@ -233,7 +231,7 @@ class SalesService
             'logo_url',
             'tax_id',
             'footer_message',
-            'return_policy'
+            'return_policy',
         ])->pluck('setting_value', 'setting_key');
 
         return [
@@ -275,7 +273,7 @@ class SalesService
             'footer' => [
                 'message' => $settings['footer_message'] ?? 'Thank you for your business!',
                 'return_policy' => $settings['return_policy'] ?? 'No return, no exchange.',
-            ]
+            ],
         ];
     }
 }

@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -31,8 +31,7 @@ class RolePermissionSeeder extends Seeder
             'superadmin' => $permissions->pluck('id'),
             'admin' => $permissionIds([
                 'Dashboard' => ['View', 'Create'],
-                'Inventory' => ['View', 'Create', 'Edit', 'Delete'],
-                'Products' => ['View', 'Create', 'Edit', 'Delete'],
+                'Products' => ['View', 'Create', 'Edit', 'Adjust Stock', 'Delete', 'Import', 'Export'],
                 'Categories' => ['View', 'Create', 'Edit', 'Delete'],
                 'Brands' => ['View', 'Create', 'Edit', 'Delete'],
                 'Attributes' => ['View', 'Create', 'Edit', 'Delete'],
@@ -47,7 +46,6 @@ class RolePermissionSeeder extends Seeder
             ]),
             'staff' => $permissionIds([
                 'Dashboard' => ['View'],
-                'Inventory' => ['View'],
                 'Products' => ['View'],
                 'Purchases' => ['View', 'Create'],
                 'POS' => ['Access', 'Create Transaction'],

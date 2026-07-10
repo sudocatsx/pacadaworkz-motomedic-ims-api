@@ -28,6 +28,7 @@ class ReportCSVService
         foreach ($data['sales_by_staff'] as $staff => $total) {
             $csvData[] = [$staff, $total];
         }
+
         return $csvData;
     }
 
@@ -55,6 +56,7 @@ class ReportCSVService
         foreach ($data['purchase_by_supplier'] as $supplier => $total) {
             $csvData[] = [$supplier, $total];
         }
+
         return $csvData;
     }
 
@@ -168,6 +170,7 @@ class ReportCSVService
                 $item['revenue'],
             ];
         }
+
         return $csvData;
     }
 
@@ -188,6 +191,7 @@ class ReportCSVService
         foreach ($data['adjustments_by_reason'] as $reason) {
             $csvData[] = [$reason->reason, $reason->num_reasons];
         }
+
         return $csvData;
     }
 
@@ -210,7 +214,6 @@ class ReportCSVService
         return $csvData;
     }
 
-
     private function arrayToCsv(array $data): string
     {
         $output = fopen('php://temp', 'r+');
@@ -220,6 +223,7 @@ class ReportCSVService
         rewind($output);
         $csv = stream_get_contents($output);
         fclose($output);
+
         return $csv;
     }
 }

@@ -2,14 +2,13 @@
 
 namespace App\Services;
 
-use App\Services\ActivityLogService;
 use App\Models\SystemSetting;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 
 class SystemSettingService
 {
@@ -22,8 +21,6 @@ class SystemSettingService
 
     /**
      * Get all system settings as key-value pairs.
-     *
-     * @return array
      */
     public function getAllSettings(): array
     {
@@ -32,9 +29,6 @@ class SystemSettingService
 
     /**
      * Bulk update or create system settings.
-     *
-     * @param array $settings
-     * @return Collection
      */
     public function updateSettings(array $settings): Collection
     {
@@ -63,9 +57,6 @@ class SystemSettingService
 
     /**
      * Delete a system setting.
-     *
-     * @param string $key
-     * @return bool
      */
     public function deleteSetting(string $key): bool
     {
@@ -78,6 +69,7 @@ class SystemSettingService
                 'Deleted',
                 "Deleted setting '{$key}' with value '{$setting->setting_value}'"
             );
+
             return true;
         }
 
@@ -88,6 +80,7 @@ class SystemSettingService
      * Create a database backup.
      *
      * @return string Relative path to the backup file
+     *
      * @throws Exception
      */
     public function backupDatabase(): string
@@ -95,7 +88,7 @@ class SystemSettingService
         $connection = config('database.default');
 
         if ($connection !== 'pgsql') {
-            throw new Exception("Backup is currently only supported for PostgreSQL.");
+            throw new Exception('Backup is currently only supported for PostgreSQL.');
         }
 
         $config = config("database.connections.{$connection}");
@@ -104,7 +97,7 @@ class SystemSettingService
         $directory = 'backups';
 
         // Ensure directory exists in storage/app/backups
-        if (!Storage::exists($directory)) {
+        if (! Storage::exists($directory)) {
             Storage::makeDirectory($directory);
         }
 
@@ -130,18 +123,18 @@ class SystemSettingService
             '-v',      // Verbose
             '-f',
             $absolutePath,
-            $config['database']
+            $config['database'],
         ];
 
         $process = new Process($command, null, $env);
         $process->setTimeout(300); // 5 minutes timeout
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             $this->activityLogService->log(
                 'Database',
                 'Backup Failed',
-                "Database backup failed: " . $process->getErrorOutput()
+                'Database backup failed: '.$process->getErrorOutput()
             );
             throw new ProcessFailedException($process);
         }
@@ -158,7 +151,8 @@ class SystemSettingService
     /**
      * Restore database from backup file.
      *
-     * @param string $filePath Absolute path to the backup file
+     * @param  string  $filePath  Absolute path to the backup file
+     *
      * @throws Exception
      */
     public function restoreDatabase(string $filePath): void
@@ -166,13 +160,13 @@ class SystemSettingService
         $connection = config('database.default');
 
         if ($connection !== 'pgsql') {
-            throw new Exception("Restore is currently only supported for PostgreSQL.");
+            throw new Exception('Restore is currently only supported for PostgreSQL.');
         }
 
         $config = config("database.connections.{$connection}");
 
-        if (!file_exists($filePath)) {
-            throw new Exception("Backup file not found.");
+        if (! file_exists($filePath)) {
+            throw new Exception('Backup file not found.');
         }
 
         // Prepare environment variables
@@ -193,18 +187,18 @@ class SystemSettingService
             $config['database'],
             '-v',
             '-c', // Clean (drop) database objects before creating
-            $filePath
+            $filePath,
         ];
 
         $process = new Process($command, null, $env);
         $process->setTimeout(300); // 5 minutes timeout
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             $this->activityLogService->log(
                 'Database',
                 'Restore Failed',
-                "Database restore failed from {$filePath}: " . $process->getErrorOutput()
+                "Database restore failed from {$filePath}: ".$process->getErrorOutput()
             );
             throw new ProcessFailedException($process);
         }

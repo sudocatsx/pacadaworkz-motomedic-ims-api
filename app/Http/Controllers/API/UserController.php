@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\API;
 
-use Illuminate\Http\Request;
 use App\Exceptions\Auth\UserNotFoundException;
-use App\Http\Controllers\API\Controller;
 use App\Http\Requests\User\ResetPasswordUserRequest;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
-use App\Services\UserService;
 use App\Http\Resources\UserResource;
+use App\Services\UserService;
+use Illuminate\Http\Request;
 
 // use App\Models\User;
 
@@ -21,12 +20,14 @@ class UserController extends Controller
     {
         $this->userService = $userService;
     }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
         $users = $this->userService->getAllUsers($request->all());
+
         // return UserResource::collection($users);
         return response()->json([
             'success' => true,
@@ -36,7 +37,7 @@ class UserController extends Controller
                 'per_page' => $users->perPage(),
                 'current_page' => $users->currentPage(),
                 'last_page' => $users->lastPage(),
-            ]
+            ],
         ]);
     }
 
@@ -55,23 +56,24 @@ class UserController extends Controller
         // ], $user ? 200 : 404);
         try {
             $user = $this->userService->getUserById($id);
+
             return response()->json([
                 'success' => true,
-                'data' => UserResource::make($user)
+                'data' => UserResource::make($user),
             ]);
         } catch (UserNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (UserNotFoundException $e) {
-            \Log::error('Settings Profile [GET] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile [GET] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -82,10 +84,11 @@ class UserController extends Controller
     public function store(StoreUserRequest $request)
     {
         $user = $this->userService->createUser($request->validated());
+
         // return new UserResource($user);
         return response()->json([
             'success' => true,
-            'data' => UserResource::make($user)
+            'data' => UserResource::make($user),
         ], 201);
     }
 
@@ -96,23 +99,24 @@ class UserController extends Controller
     {
         try {
             $user = $this->userService->updateUserById($id, $request->validated());
+
             return response()->json([
                 'success' => true,
-                'data' => UserResource::make($user)
+                'data' => UserResource::make($user),
             ]);
         } catch (UserNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (UserNotFoundException $e) {
-            \Log::error('Settings Profile [GET] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile [GET] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -143,23 +147,24 @@ class UserController extends Controller
 
         try {
             $response = $this->userService->deleteUserById($id);
+
             return response()->json([
                 'success' => $response,
-                'message' => "User with an id of [{$id}] is deleted successfully"
+                'message' => "User with an id of [{$id}] is deleted successfully",
             ]);
         } catch (UserNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (UserNotFoundException $e) {
-            \Log::error('Settings Profile [GET] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile [GET] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -167,24 +172,25 @@ class UserController extends Controller
     public function resetPassword(ResetPasswordUserRequest $request, int $id)
     {
         try {
-            $response  = $this->userService->resetPasswordById($id, $request->validated());
+            $response = $this->userService->resetPasswordById($id, $request->validated());
+
             return response()->json([
                 'success' => $response,
-                'message' => "Password reset successfully"
+                'message' => 'Password reset successfully',
             ], 200);
         } catch (UserNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (UserNotFoundException $e) {
-            \Log::error('Settings Profile [GET] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile [GET] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }

@@ -73,13 +73,12 @@ function createDashboardSalesItem(
     float $unitPrice,
     ?string $date = null,
     float $refundAmount = 0,
-): void
-{
+): void {
     $now = $date ? Carbon::parse($date) : Carbon::now();
     $netAmount = ($quantity - $quantityReturned) * $unitPrice;
     $transactionId = DB::table('sales_transactions')->insertGetId([
         'user_id' => $user->id,
-        'transaction_no' => 'DASH-' . $status . '-' . $productId . '-' . uniqid(),
+        'transaction_no' => 'DASH-'.$status.'-'.$productId.'-'.uniqid(),
         'subtotal' => $netAmount,
         'tax' => 0,
         'discount' => 0,
@@ -111,7 +110,7 @@ function createDashboardPurchaseOrder(User $user, string $date, string $status, 
 {
     $now = Carbon::parse($date);
     $supplierId = DB::table('suppliers')->insertGetId([
-        'name' => 'Dashboard Supplier ' . uniqid(),
+        'name' => 'Dashboard Supplier '.uniqid(),
         'created_at' => $now,
         'updated_at' => $now,
     ]);
@@ -133,14 +132,13 @@ function createDashboardInventoryRecord(int $productId, int $quantity): void
 {
     $now = Carbon::now();
     $supplierId = DB::table('suppliers')->insertGetId([
-        'name' => 'Inventory Supplier ' . uniqid(),
+        'name' => 'Inventory Supplier '.uniqid(),
         'created_at' => $now,
         'updated_at' => $now,
     ]);
 
     DB::table('inventory')->insert([
         'product_id' => $productId,
-        'supplier_id' => $supplierId,
         'quantity' => $quantity,
         'last_stock_in' => $quantity > 0 ? $now : null,
         'created_at' => $now,

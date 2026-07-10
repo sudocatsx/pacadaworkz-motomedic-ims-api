@@ -1,14 +1,15 @@
 <?php
+
 namespace App\Services;
+
 use App\Models\Permission;
 
-class PermissionService{
+class PermissionService
+{
+    public function getAllPermissions()
+    {
 
-    public function getAllPermissions(){
-       
         return Permission::all();
 
     }
-    
-
 }

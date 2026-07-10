@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\API\Controller;
-use Illuminate\Http\Request;
 use App\Http\Requests\Role\RolesPermissionRequest;
-use App\Services\RolePermissionService;
 use App\Http\Resources\RolePermissionResource;
+use App\Services\RolePermissionService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class RolePermissionController extends Controller
@@ -21,7 +19,6 @@ class RolePermissionController extends Controller
     /**
      * Assign permissions to a role.
      *
-     * @param  RolesPermissionRequest  $request
      * @param  int  $id  Role ID
      * @return \Illuminate\Http\JsonResponse
      */
@@ -37,18 +34,18 @@ class RolePermissionController extends Controller
                 'message' => $result['message'],
                 'data' => [
                     'role_name' => $result['role_name'],
-                    'permissions' => $permissionsResource
-                ]
+                    'permissions' => $permissionsResource,
+                ],
             ], 200);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Role not found'
+                'message' => 'Role not found',
             ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' =>  'An error occured',
+                'message' => 'An error occured',
             ], 500);
         }
     }

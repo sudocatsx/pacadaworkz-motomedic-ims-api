@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Settings\Security;
 
-use Illuminate\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class ChangePasswordRequest extends FormRequest
 {
@@ -25,9 +25,10 @@ class ChangePasswordRequest extends FormRequest
         return [
             'current_password' => 'required|string|current_password',
             'new_password' => 'required|string|min:8|different:current_password',
-            'confirm_new_password' => 'required|string|same:new_password'
+            'confirm_new_password' => 'required|string|same:new_password',
         ];
     }
+
     public function withValidator(Validator $validator)
     {
         $validator->after(function ($validator) {

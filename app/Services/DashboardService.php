@@ -2,14 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\SalesItem;
 use App\Models\SalesTransaction;
 use App\Models\User;
-use App\Models\SalesItem;
-use App\Models\Inventory;
-use App\Models\Category;
-use App\Models\Brand;
-use App\Models\ActivityLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -97,9 +97,9 @@ class DashboardService
                 'total_revenue' => $revenue,
                 'total_transactions' => $transactionCount,
                 'total_sales' => $salesItem,
-                'active_users' => $userCount
+                'active_users' => $userCount,
             ]);
-        } else if ($user->role->role_name == 'staff') {
+        } elseif ($user->role->role_name == 'staff') {
             return array_merge($dailyStats, [
                 'total_products' => $productCount,
             ]);
@@ -195,21 +195,21 @@ class DashboardService
             ->where('inventory.quantity', '>', 0)
             ->sum(DB::raw('inventory.quantity * products.cost_price'));
 
-        $totalInStocksProducts =  Inventory::join('products', 'inventory.product_id', '=', 'products.id')
+        $totalInStocksProducts = Inventory::join('products', 'inventory.product_id', '=', 'products.id')
             ->whereNull('products.deleted_at')
             ->where('inventory.quantity', '>', 0)
             ->count();
 
-        $reOrderStock =  Inventory::join('products', 'inventory.product_id', '=', 'products.id')
+        $reOrderStock = Inventory::join('products', 'inventory.product_id', '=', 'products.id')
             ->whereNull('products.deleted_at')
             ->whereColumn('inventory.quantity', '<=', 'products.reorder_level')
             ->where('inventory.quantity', '>=', 0)
             ->count();
 
         return [
-            'total_inventory_value' => doubleval($totalInventoryValue),
+            'total_inventory_value' => floatval($totalInventoryValue),
             'in_stock_products' => $totalInStocksProducts,
-            'need_reorder' => $reOrderStock
+            'need_reorder' => $reOrderStock,
         ];
     }
 
@@ -219,9 +219,9 @@ class DashboardService
         $user = auth('api')->user();
 
         // Check if user is admin/superadmin OR has "View All Activity Logs" permission
-        if (!$user->relationLoaded('role')) {
+        if (! $user->relationLoaded('role')) {
             $user->load('role.permissions');
-        } elseif (!$user->role->relationLoaded('permissions')) {
+        } elseif (! $user->role->relationLoaded('permissions')) {
             $user->role->load('permissions');
         }
 
@@ -233,7 +233,7 @@ class DashboardService
 
         $query = ActivityLog::with('user')->orderBy('created_at', 'desc');
 
-        if (!$isAdminOrSuperAdmin && !$hasViewAllPermission) {
+        if (! $isAdminOrSuperAdmin && ! $hasViewAllPermission) {
             // If not admin/superadmin and doesn't have "View All" permission, restrict to own logs
             $query->where('user_id', $user->id);
         }

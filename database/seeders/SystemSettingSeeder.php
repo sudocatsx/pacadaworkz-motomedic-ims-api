@@ -20,7 +20,7 @@ class SystemSettingSeeder extends Seeder
             'currency_symbol' => '₱',
             'footer_message' => 'Thank you for your business!',
             'return_policy' => 'No return, no exchange.',
-            'logo_url' => null, 
+            'logo_url' => null,
         ];
 
         foreach ($settings as $key => $value) {
@@ -28,7 +28,7 @@ class SystemSettingSeeder extends Seeder
                 ['setting_key' => $key],
                 [
                     'setting_value' => $value,
-                    'description' => $this->getDescription($key)
+                    'description' => $this->getDescription($key),
                 ]
             );
         }

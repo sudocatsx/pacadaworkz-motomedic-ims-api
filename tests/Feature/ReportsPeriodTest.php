@@ -32,7 +32,7 @@ function createSalesTransactionForDate(User $user, string $date, float $total): 
 {
     DB::table('sales_transactions')->insert([
         'user_id' => $user->id,
-        'transaction_no' => 'TXN-' . str_replace(['-', ' ', ':'], '', $date),
+        'transaction_no' => 'TXN-'.str_replace(['-', ' ', ':'], '', $date),
         'subtotal' => $total,
         'tax' => 0,
         'discount' => 0,
@@ -72,19 +72,19 @@ function createInventoryReportProduct(
 ): int {
     $now = Carbon::now();
     $categoryId = DB::table('categories')->insertGetId([
-        'name' => $name . ' Category',
+        'name' => $name.' Category',
         'description' => null,
         'created_at' => $now,
         'updated_at' => $now,
     ]);
     $brandId = DB::table('brands')->insertGetId([
-        'name' => $name . ' Brand',
+        'name' => $name.' Brand',
         'description' => null,
         'created_at' => $now,
         'updated_at' => $now,
     ]);
     $supplierId = DB::table('suppliers')->insertGetId([
-        'name' => $name . ' Supplier',
+        'name' => $name.' Supplier',
         'created_at' => $now,
         'updated_at' => $now,
     ]);
@@ -105,7 +105,6 @@ function createInventoryReportProduct(
 
     DB::table('inventory')->insert([
         'product_id' => $productId,
-        'supplier_id' => $supplierId,
         'quantity' => $quantity,
         'last_stock_in' => $quantity > 0 ? $now : null,
         'created_at' => $now,
@@ -128,7 +127,7 @@ function createReportSalesItem(
     $netAmount = max($quantity - $quantityReturned, 0) * $unitPrice;
     $transactionId = DB::table('sales_transactions')->insertGetId([
         'user_id' => $user->id,
-        'transaction_no' => 'RPT-' . $status . '-' . $productId . '-' . uniqid(),
+        'transaction_no' => 'RPT-'.$status.'-'.$productId.'-'.uniqid(),
         'subtotal' => $netAmount,
         'tax' => 0,
         'discount' => 0,

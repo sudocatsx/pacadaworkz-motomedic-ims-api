@@ -6,7 +6,6 @@ use App\Models\Role;
 
 class RoleService
 {
-
     protected $activityLogService;
 
     public function __construct(ActivityLogService $activityLogService)
@@ -25,12 +24,11 @@ class RoleService
         return Role::with('permissions')->withCount('users')->findOrFail($id);
     }
 
-
     public function create(array $data)
     {
         $role = Role::create([
             'role_name' => $data['role_name'],
-            'description' => $data['description']
+            'description' => $data['description'],
         ]);
 
         $this->activityLogService->log(
@@ -42,8 +40,6 @@ class RoleService
 
         return $role->load('permissions')->loadCount('users');
     }
-
-
 
     public function update(array $data, $id)
     {
@@ -62,8 +58,6 @@ class RoleService
         return $role->load('permissions')->loadCount('users');
     }
 
-
-
     public function delete($id)
     {
         $role = Role::findOrFail($id);
@@ -81,5 +75,4 @@ class RoleService
 
         return true;
     }
-
 }

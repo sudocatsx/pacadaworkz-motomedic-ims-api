@@ -8,6 +8,7 @@ namespace App\Swagger\Schemas;
  *     type="object",
  *     title="User Resource",
  *     description="User resource representation",
+ *
  *     @OA\Property(property="id", type="integer", format="int64", description="User ID"),
  *     @OA\Property(property="role_id", type="integer", description="Role ID"),
  *     @OA\Property(property="name", type="string", description="Username"),
@@ -23,6 +24,7 @@ namespace App\Swagger\Schemas;
  *     type="object",
  *     title="Store User Request",
  *     required={"role_id", "name", "email", "first_name", "last_name", "is_default_password"},
+ *
  *     @OA\Property(property="role_id", type="integer", description="Role ID"),
  *     @OA\Property(property="name", type="string", description="Username", minLength=1, maxLength=50),
  *     @OA\Property(property="email", type="string", format="email", description="Email address"),
@@ -37,6 +39,7 @@ namespace App\Swagger\Schemas;
  *     schema="UpdateUserRequest",
  *     type="object",
  *     title="Update User Request",
+ *
  *     @OA\Property(property="role_id", type="integer", description="Role ID"),
  *     @OA\Property(property="name", type="string", description="Username", minLength=1, maxLength=50),
  *     @OA\Property(property="email", type="string", format="email", description="Email address"),
@@ -51,6 +54,7 @@ namespace App\Swagger\Schemas;
  *     type="object",
  *     title="Reset Password User Request",
  *     required={"is_default_password"},
+ *
  *     @OA\Property(property="new_password", type="string", format="password", description="New password (required if is_default_password is false)", minLength=6),
  *     @OA\Property(property="is_default_password", type="boolean", description="Use default password")
  * )
@@ -59,6 +63,7 @@ namespace App\Swagger\Schemas;
  *     schema="WrappedUserResourceResponse",
  *     type="object",
  *     title="Wrapped User Resource Response",
+ *
  *     @OA\Property(property="success", type="boolean", example=true),
  *     @OA\Property(property="data", ref="#/components/schemas/UserResource")
  * )
@@ -67,12 +72,15 @@ namespace App\Swagger\Schemas;
  *     schema="WrappedUserCollectionResponse",
  *     type="object",
  *     title="Wrapped User Collection Response",
+ *
  *     @OA\Property(property="success", type="boolean", example=true),
  *     @OA\Property(
  *         property="data",
  *         type="array",
+ *
  *         @OA\Items(ref="#/components/schemas/UserResource")
  *     ),
+ *
  *     @OA\Property(
  *         property="meta",
  *         type="object",
@@ -83,6 +91,4 @@ namespace App\Swagger\Schemas;
  *     )
  * )
  */
-class UserSchemas
-{
-}
+class UserSchemas {}

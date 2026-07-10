@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class SalesTrendResource extends JsonResource
@@ -12,6 +11,6 @@ class SalesTrendResource extends JsonResource
      */
     public static function format(array $data): array
     {
-        return collect($data)->map(fn($value) => (float) $value)->toArray();
+        return collect($data)->map(fn ($value) => (float) $value)->toArray();
     }
 }

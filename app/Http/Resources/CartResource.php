@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\CartItemResource;
 
 class CartResource extends JsonResource
 {
@@ -19,7 +18,7 @@ class CartResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
-            'cart_items' => CartItemResource::collection($this->whenLoaded('cart_items'))
+            'cart_items' => CartItemResource::collection($this->whenLoaded('cart_items')),
         ];
     }
 }

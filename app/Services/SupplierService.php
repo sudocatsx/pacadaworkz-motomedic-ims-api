@@ -1,8 +1,8 @@
 <?php
+
 namespace App\Services;
 
 use App\Models\Supplier;
-use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -14,6 +14,7 @@ class SupplierService
     {
         $this->activityLogService = $activityLogService;
     }
+
     public function getAllSuppliers($search = null, $perPage = 10)
     {
         $query = Supplier::query();
@@ -39,7 +40,8 @@ class SupplierService
     public function createSupplier(array $data)
     {
         $supplier = Supplier::create($data);
-        $this->activityLogService->log('Supplier', 'Created', 'Created supplier: ' . $supplier->name, Auth::id());
+        $this->activityLogService->log('Supplier', 'Created', 'Created supplier: '.$supplier->name, Auth::id());
+
         return $supplier;
     }
 
@@ -50,6 +52,7 @@ class SupplierService
         $supplier_name = $supplier->name;
         $supplier->update($data);
         $this->activityLogService->log('Supplier', 'Updated', "Update supplier info #{$supplier_name}", Auth::id());
+
         return $supplier;
     }
 
@@ -61,7 +64,7 @@ class SupplierService
             throw new ConflictHttpException('Supplier cannot be deleted while purchases or inventory records use it.');
         }
 
-        $this->activityLogService->log('Supplier', 'Deleted', 'Deleted supplier: ' . $supplier->name, Auth::id());
+        $this->activityLogService->log('Supplier', 'Deleted', 'Deleted supplier: '.$supplier->name, Auth::id());
         $supplier->delete();
     }
 }

@@ -2,16 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\Cart;
-use App\Models\User;
-use App\Models\Product;
-use App\Models\SalesTransaction;
-use App\Models\SalesItem;
-use App\Models\Inventory;
+use App\Exceptions\Inventory\InsufficientStockException;
 use App\Exceptions\POS\Cart\CartItemNotFoundException;
 use App\Exceptions\POS\Cart\EmptyCartException;
-use App\Exceptions\Inventory\InsufficientStockException;
 use App\Exceptions\POS\InsufficientPaymentException;
+use App\Models\Cart;
+use App\Models\Inventory;
+use App\Models\Product;
+use App\Models\SalesItem;
+use App\Models\SalesTransaction;
 use App\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,19 +19,28 @@ class PosService
 {
     public function __construct(private ActivityLogService $activityLogService) {}
 
+    public function getProducts()
+    {
+        return Product::query()
+            ->with(['category', 'brand', 'inventory', 'attribute_values.attribute'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
     public function getCart(int $userId)
     {
-        //create cart kung waley pa
+        // create cart kung waley pa
         $cart = $this->createCart($userId);
 
-        //woah load lopet orm
+        // woah load lopet orm
         $cart->load('cart_items.product.inventory');
 
         $result['cart'] = $cart;
 
         $itemsCount = $cart->cart_items->count();
         $totalQuantity = $cart->cart_items->sum('quantity');
-        $subtotal = $cart->cart_items->sum(fn($item) => $item->unit_price * $item->quantity);
+        $subtotal = $cart->cart_items->sum(fn ($item) => $item->unit_price * $item->quantity);
         $discountAmount = 0.00;
 
         if ($cart->discount > 0) {
@@ -54,6 +62,7 @@ class PosService
             'discount' => $discountAmount,
             'total' => $total,
         ];
+
         return $result;
     }
 
@@ -61,11 +70,15 @@ class PosService
     {
         $productId = $itemDetails['product_id'];
 
-        //validate Product exists and is not soft-deleted
+        // validate Product exists and is not soft-deleted
         $product = Product::with('inventory')->findOrFail($productId);
 
-        if (!$product->inventory || $product->inventory->quantity <= 0) {
-            throw new InsufficientStockException("Product is out of stock");
+        if (! $product->is_active) {
+            throw new InsufficientStockException('Product is inactive');
+        }
+
+        if (! $product->inventory || $product->inventory->quantity <= 0) {
+            throw new InsufficientStockException('Product is out of stock');
         }
 
         $cart = $this->createCart($userId);
@@ -86,9 +99,8 @@ class PosService
             ]);
         }
 
-        //find name first of the product
+        // find name first of the product
         $name = $product->name;
-
 
         $this->activityLogService->log(
             module: 'POS',
@@ -108,13 +120,18 @@ class PosService
 
         $cartItem = $cart->cart_items()->with('product.inventory')->where('id', $cartItemId)->first();
 
-        if (!$cartItem)
-            throw new CartItemNotFoundException();
+        if (! $cartItem) {
+            throw new CartItemNotFoundException;
+        }
 
         $product = $cartItem->product;
         $name = $product->name;
 
-        if (!$product->inventory || $quantity > $product->inventory->quantity) {
+        if (! $product->is_active) {
+            throw new InsufficientStockException('Product is inactive');
+        }
+
+        if (! $product->inventory || $quantity > $product->inventory->quantity) {
             $available = $product->inventory ? $product->inventory->quantity : 0;
             throw new InsufficientStockException("Insufficient stock. Only {$available} available.");
         }
@@ -123,7 +140,6 @@ class PosService
         $cartItem->save();
 
         $cartItem->load('product.inventory');
-
 
         $this->activityLogService->log(
             module: 'POS',
@@ -141,12 +157,11 @@ class PosService
 
         $cartItem = $cart->cart_items()->where('id', $cartItemId)->first();
         $name = $cartItem->product->name;
-        if (!$cartItem)
-            throw new CartItemNotFoundException();
+        if (! $cartItem) {
+            throw new CartItemNotFoundException;
+        }
 
         $cartItem->delete();
-
-
 
         $this->activityLogService->log(
             module: 'POS',
@@ -154,7 +169,6 @@ class PosService
             description: "Delete cart, product name:{$name}",
             userId: $userId
         );
-
 
         return true;
     }
@@ -167,7 +181,7 @@ class PosService
         $this->activityLogService->log(
             module: 'POS',
             action: 'clear carts',
-            description: "remove overall cart items in list",
+            description: 'remove overall cart items in list',
             userId: $userId
         );
 
@@ -178,14 +192,15 @@ class PosService
     {
         $cart = $this->createCart($userId);
 
-        if (!$cart->cart_items()->exists())
-            throw new EmptyCartException();
+        if (! $cart->cart_items()->exists()) {
+            throw new EmptyCartException;
+        }
 
         $cart->discount = $discountDetails['discount'];
         $cart->discount_type = $discountDetails['discount_type'];
         $cart->save();
 
-        $discount =  $discountDetails['discount'];
+        $discount = $discountDetails['discount'];
         $discount_type = $discountDetails['discount_type'];
         $this->activityLogService->log(
             module: 'POS',
@@ -202,18 +217,21 @@ class PosService
         return DB::transaction(function () use ($userId, $paymentDetails) {
             $cart = Cart::where('user_id', $userId)->with('cart_items')->firstOrFail();
 
-            if ($cart->cart_items->isEmpty())
-                throw new EmptyCartException();
+            if ($cart->cart_items->isEmpty()) {
+                throw new EmptyCartException;
+            }
 
-            //calculate totals and validate stock
+            // calculate totals and validate stock
             $subtotal = 0;
             $cartItems = $cart->cart_items;
 
             foreach ($cartItems as $item) {
-                $inventory = Inventory::where('product_id', $item->product_id)->first();
+                $product = Product::with('inventory')->find($item->product_id);
+                $inventory = $product?->inventory;
 
-                if (!$inventory || $inventory->quantity < $item->quantity)
-                    throw new InsufficientStockException("Insufficient stock for product ID: " . $item->product_id);
+                if (! $product?->is_active || ! $inventory || $inventory->quantity < $item->quantity) {
+                    throw new InsufficientStockException('Insufficient stock for product ID: '.$item->product_id);
+                }
 
                 $subtotal += $item->quantity * $item->unit_price;
             }
@@ -232,15 +250,16 @@ class PosService
             // Calculate change
             $amountTendered = isset($paymentDetails['amount_tendered']) ? floatval($paymentDetails['amount_tendered']) : $totalAmount;
 
-            if ($amountTendered < $totalAmount)
+            if ($amountTendered < $totalAmount) {
                 throw new InsufficientPaymentException("Payment is less than the total amount of {$totalAmount}");
+            }
 
             $change = max(0, $amountTendered - $totalAmount);
 
-            //create sales transaction
+            // create sales transaction
             $transaction = SalesTransaction::create([
                 'user_id' => $userId,
-                'transaction_no' => 'TRX-' . date('Ymd') . '-' . Str::upper(Str::random(6)),
+                'transaction_no' => 'TRX-'.date('Ymd').'-'.Str::upper(Str::random(6)),
                 'subtotal' => $subtotal,
                 'tax' => 0,
                 'discount' => $discountAmount,
@@ -251,7 +270,7 @@ class PosService
                 'change' => $change,
             ]);
 
-            //create sales items along with its stock movement and deduct inventory stock
+            // create sales items along with its stock movement and deduct inventory stock
             foreach ($cartItems as $item) {
                 SalesItem::create([
                     'sales_transactions_id' => $transaction->id,
@@ -270,7 +289,7 @@ class PosService
                     'notes' => "POS Checkout - Transaction # {$transaction->transaction_no}",
                 ]);
 
-                //deduct inventory
+                // deduct inventory
                 $inventory = Inventory::where('product_id', $item->product_id)->first();
                 $inventory->decrement('quantity', $item->quantity);
             }

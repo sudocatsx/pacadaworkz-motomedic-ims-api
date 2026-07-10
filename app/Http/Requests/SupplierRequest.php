@@ -46,7 +46,7 @@ class SupplierRequest extends FormRequest
 
         if ($this->isMethod('patch')) {
             $rules = collect($rules)->map(function ($rule) {
-                return is_array($rule) ? ['sometimes', ...$rule] : 'sometimes|' . $rule;
+                return is_array($rule) ? ['sometimes', ...$rule] : 'sometimes|'.$rule;
             })->all();
         }
 

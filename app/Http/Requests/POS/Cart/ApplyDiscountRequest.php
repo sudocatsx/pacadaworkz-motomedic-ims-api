@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests\POS\Cart;
 
-use Illuminate\Foundation\Http\FormRequest;
 use App\Services\PosService;
-use Illuminate\Validation\Rule;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ApplyDiscountRequest extends FormRequest
 {

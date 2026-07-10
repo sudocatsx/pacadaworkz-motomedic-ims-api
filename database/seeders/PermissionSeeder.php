@@ -19,15 +19,14 @@ class PermissionSeeder extends Seeder
         $permissionSets = [
             'Dashboard' => ['View', 'Create'],
 
-            'Inventory'   => ['View', 'Create', 'Edit', 'Delete'],
-            'Products'    => ['View', 'Create', 'Edit', 'Delete'],
-            'Categories'  => ['View', 'Create', 'Edit', 'Delete'],
-            'Brands'      => ['View', 'Create', 'Edit', 'Delete'],
-            'Attributes'  => ['View', 'Create', 'Edit', 'Delete'],
-            'Suppliers'   => ['View', 'Create', 'Edit', 'Delete'],
-            'Purchases'   => ['View', 'Create', 'Edit', 'Delete'],
-            'Users'       => ['View', 'Create', 'Edit', 'Delete'],
-            'Roles'       => ['View', 'Create', 'Edit', 'Delete'],
+            'Products' => ['View', 'Create', 'Edit', 'Adjust Stock', 'Delete', 'Import', 'Export'],
+            'Categories' => ['View', 'Create', 'Edit', 'Delete'],
+            'Brands' => ['View', 'Create', 'Edit', 'Delete'],
+            'Attributes' => ['View', 'Create', 'Edit', 'Delete'],
+            'Suppliers' => ['View', 'Create', 'Edit', 'Delete'],
+            'Purchases' => ['View', 'Create', 'Edit', 'Delete'],
+            'Users' => ['View', 'Create', 'Edit', 'Delete'],
+            'Roles' => ['View', 'Create', 'Edit', 'Delete'],
 
             'POS' => ['Access', 'Create Transaction'],
 
@@ -35,19 +34,17 @@ class PermissionSeeder extends Seeder
 
             'Activity Logs' => ['View Own', 'View All', 'Export'],
 
-           
             'Settings' => ['View', 'Edit'],
         ];
-
 
         foreach ($permissionSets as $module => $actions) {
             foreach ($actions as $action) {
                 $permissions[] = [
                     'name' => $action,
-                    'description'     => $action . ' ' . $module,
-                    'module'          => $module,
-                    'created_at'      => $timestamp,
-                    'updated_at'      => $timestamp,
+                    'description' => $action.' '.$module,
+                    'module' => $module,
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
                 ];
             }
         }

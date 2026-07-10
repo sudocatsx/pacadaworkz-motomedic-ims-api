@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('roles', function (Blueprint $table) {
             $table->id();
-            $table->string('role_name',50);
+            $table->string('role_name', 50);
             $table->text('description')->nullable();
             $table->timestamps();
             $table->softDeletes();

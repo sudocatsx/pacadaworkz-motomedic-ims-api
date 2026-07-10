@@ -23,10 +23,7 @@ class CategoryRequest extends FormRequest
     public function rules(): array
     {
 
-          // $isupdate = $this->method == 'PUT' || $this->method == 'PATCH';
-
-        
-
+        // $isupdate = $this->method == 'PUT' || $this->method == 'PATCH';
 
         return [
             'name' => [

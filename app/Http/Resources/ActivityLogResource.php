@@ -14,14 +14,14 @@ class ActivityLogResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        //return parent::toArray($request);
+        // return parent::toArray($request);
 
         return [
-          'timestamp' => $this->created_at,
-          'user' => $this->user->name,
-          'module' => $this->module,
-          'action' => $this->action,
-           'details' => $this->description
+            'timestamp' => $this->created_at,
+            'user' => $this->user->name,
+            'module' => $this->module,
+            'action' => $this->action,
+            'details' => $this->description,
         ];
     }
 }

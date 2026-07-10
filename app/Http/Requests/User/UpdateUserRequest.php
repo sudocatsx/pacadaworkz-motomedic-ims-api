@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\User;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
@@ -40,14 +40,13 @@ class UpdateUserRequest extends FormRequest
             'is_active' => 'sometimes|boolean',
 
             'id' => 'prohibited',
-            'password'   => 'prohibited',
+            'password' => 'prohibited',
             'deleted_at' => 'prohibited',
             'created_at' => 'prohibited',
-            'updated_at' => 'prohibited'
+            'updated_at' => 'prohibited',
             // 'last_login' => 'prohibited', //disabled ko muna baka magamit itong endpoint na ito pang recycle
         ];
     }
-
 
     public function withValidator(Validator $validator)
     {
@@ -77,7 +76,7 @@ class UpdateUserRequest extends FormRequest
         throw new HttpResponseException(response()->json([
             'success' => false,
             'message' => 'Validation errors',
-            'data' => $validator->errors()
+            'data' => $validator->errors(),
         ], 422));
     }
 }

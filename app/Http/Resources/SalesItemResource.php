@@ -20,7 +20,7 @@ class SalesItemResource extends JsonResource
             // 'sales_transactions_id' => $this->sales_transactions_id,
             'product_id' => $this->product_id,
             'unit_price' => intval($this->unit_price),
-            'quantity' => $this->quantity
+            'quantity' => $this->quantity,
         ];
     }
 }

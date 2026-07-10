@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\SalesItemResource;
 
 class SalesTransactionResource extends JsonResource
 {
@@ -30,7 +29,7 @@ class SalesTransactionResource extends JsonResource
             'change' => (float) $this->change,
             'status' => $this->status,
             'created_at' => $this->created_at,
-            'sales_item' => SalesItemResource::collection($this->whenLoaded('sales_items'))
+            'sales_item' => SalesItemResource::collection($this->whenLoaded('sales_items')),
         ];
     }
 }

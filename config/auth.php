@@ -13,11 +13,10 @@ return [
     |
     */
 
-'defaults' => [
-    'guard' => 'api',
-    'passwords' => 'users',
-],
-
+    'defaults' => [
+        'guard' => 'api',
+        'passwords' => 'users',
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -42,10 +41,10 @@ return [
             'provider' => 'users',
         ],
 
-            'api' => [
-        'driver' => 'jwt',     // JWT driver
-        'provider' => 'users', // User provider
-    ],
+        'api' => [
+            'driver' => 'jwt',     // JWT driver
+            'provider' => 'users', // User provider
+        ],
     ],
 
     /*

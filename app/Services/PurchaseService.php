@@ -4,9 +4,8 @@ namespace App\Services;
 
 use App\Exceptions\Purchase\PurchaseReceiveException;
 use App\Exceptions\Purchase\PurchaseUpdateException;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseItem;
 use App\Models\Inventory;
+use App\Models\PurchaseOrder;
 use App\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
 
@@ -19,12 +18,12 @@ class PurchaseService
         $this->activityLogService = $activityLogService;
     }
 
-    //get purchase service
+    // get purchase service
     public function getPurchases($search = null)
     {
         $query = PurchaseOrder::with(['supplier', 'user', 'purchase_items.product']);
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
 
                 // Supplier match
@@ -75,6 +74,7 @@ class PurchaseService
             }
 
             $this->activityLogService->log('Purchase', 'Create', "Created purchase order #{$purchase->id}");
+
             return $purchase->load('purchase_items.product');
         });
     }
@@ -84,14 +84,14 @@ class PurchaseService
         return PurchaseOrder::with(['supplier', 'user', 'purchase_items.product'])->findOrFail($id);
     }
 
-    //update purchase service
+    // update purchase service
     public function updatePurchase($id, array $data)
     {
         return DB::transaction(function () use ($id, $data) {
             $purchase = PurchaseOrder::findOrFail($id);
 
             if ($purchase->status === 'received') {
-                throw new PurchaseUpdateException("Cannot update a received purchase order.");
+                throw new PurchaseUpdateException('Cannot update a received purchase order.');
             }
 
             $items = $data['items'] ?? null;
@@ -119,6 +119,7 @@ class PurchaseService
             $purchase->update($data);
 
             $this->activityLogService->log('Purchase', 'Update', "Updated purchase order #{$purchase->id}");
+
             return $purchase->load('purchase_items.product');
         });
     }
@@ -129,11 +130,12 @@ class PurchaseService
         $purchase = PurchaseOrder::findOrFail($id);
 
         if ($purchase->status === 'received') {
-            throw new PurchaseUpdateException("Cannot delete a received purchase order.");
+            throw new PurchaseUpdateException('Cannot delete a received purchase order.');
         }
 
         $purchase->delete();
         $this->activityLogService->log('Purchase', 'Delete', "Deleted purchase order #{$purchase->id}");
+
         return true;
     }
 
@@ -150,7 +152,7 @@ class PurchaseService
             }
 
             if ($purchase->status === 'cancelled') {
-                throw new PurchaseReceiveException("Cannot receive a cancelled purchase order.", 400);
+                throw new PurchaseReceiveException('Cannot receive a cancelled purchase order.', 400);
             }
 
             foreach ($purchase->purchase_items as $item) {
@@ -190,7 +192,7 @@ class PurchaseService
                     'quantity' => $newQuantity,
                     'reference_type' => 'purchase',
                     'reference_id' => $purchase->id,
-                    'notes' => "Received from purchase order #{$purchase->id}. Calculated WAC: {$newWac}"
+                    'notes' => "Received from purchase order #{$purchase->id}. Calculated WAC: {$newWac}",
                 ]);
             }
 

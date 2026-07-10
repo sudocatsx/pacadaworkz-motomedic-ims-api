@@ -16,7 +16,7 @@ class UserResource extends JsonResource
     {
         /* wag delete baka magamit */
         // return parent::toArray($request);
-        //customize response
+        // customize response
         return [
             'id' => $this->id,
             'role_id' => $this->role_id,

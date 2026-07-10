@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class RolePermission extends Pivot
 {
     use SoftDeletes;
+
     protected $dates = ['deleted_at'];
     //
 
-
-        // fillable is for mass assigment (allowed na ifill up)
-      protected $fillable = [
+    // fillable is for mass assigment (allowed na ifill up)
+    protected $fillable = [
         'role_id',
-        'permission_id'
+        'permission_id',
     ];
 
     public function role()

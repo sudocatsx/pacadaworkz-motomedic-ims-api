@@ -18,29 +18,36 @@ class ProductEndpoints
      *      summary="Get list of products",
      *      description="Returns list of products",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Parameter(
      *          name="search",
      *          in="query",
      *          description="Search by name, description or sku",
      *          required=false,
+     *
      *          @OA\Schema(
      *              type="string"
      *          )
      *      ),
+     *
      *      @OA\Parameter(
      *          name="filter",
      *          in="query",
      *          description="Filter by category or brand",
      *          required=false,
+     *
      *          @OA\Schema(
      *              type="string"
      *          )
      *      ),
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/WrappedProductCollectionResponse")
      *       ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized")
      * )
      */
@@ -54,20 +61,25 @@ class ProductEndpoints
      *      summary="Get product information",
      *      description="Returns product data",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Parameter(
      *          name="id",
      *          description="Product id",
      *          required=true,
      *          in="path",
+     *
      *          @OA\Schema(
      *              type="integer"
      *          )
      *      ),
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/WrappedProductResponse")
      *       ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized"),
      *      @OA\Response(response="404", ref="#/components/responses/NotFound")
      * )
@@ -82,16 +94,21 @@ class ProductEndpoints
      *      summary="Create a new product",
      *      description="Creates a new product",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\RequestBody(
      *          required=true,
      *          description="Product request body",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/ProductRequest")
      *      ),
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/WrappedProductResponse")
      *      ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized"),
      *      @OA\Response(response="422", ref="#/components/responses/UnprocessableEntity")
      * )
@@ -106,25 +123,32 @@ class ProductEndpoints
      *      summary="Update existing product",
      *      description="Updates an existing product",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Parameter(
      *          name="id",
      *          description="Product id",
      *          required=true,
      *          in="path",
+     *
      *          @OA\Schema(
      *              type="integer"
      *          )
      *      ),
+     *
      *      @OA\RequestBody(
      *          required=true,
      *          description="Product request body",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/ProductRequest")
      *      ),
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/WrappedProductResponse")
      *      ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized"),
      *      @OA\Response(response="404", ref="#/components/responses/NotFound"),
      *      @OA\Response(response="422", ref="#/components/responses/UnprocessableEntity")
@@ -140,20 +164,25 @@ class ProductEndpoints
      *      summary="Delete existing product",
      *      description="Deletes a record and returns no content",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Parameter(
      *          name="id",
      *          description="Product id",
      *          required=true,
      *          in="path",
+     *
      *          @OA\Schema(
      *              type="integer"
      *          )
      *      ),
-      *      @OA\Response(
+     *
+     *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/WrappedMessageResponse")
      *      ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized"),
      *      @OA\Response(response="404", ref="#/components/responses/NotFound")
      * )
@@ -168,29 +197,36 @@ class ProductEndpoints
      *      summary="Delete existing product attribute",
      *      description="Deletes a product attribute record and returns a success message",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Parameter(
      *          name="id",
      *          description="Product id",
      *          required=true,
      *          in="path",
+     *
      *          @OA\Schema(
      *              type="integer"
      *          )
      *      ),
+     *
      *      @OA\Parameter(
      *          name="attributeValueId",
      *          description="Attribute Value id",
      *          required=true,
      *          in="path",
+     *
      *          @OA\Schema(
      *              type="integer"
      *          )
      *      ),
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/WrappedMessageResponse")
      *      ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized"),
      *      @OA\Response(response="404", ref="#/components/responses/NotFound")
      * )
@@ -205,13 +241,16 @@ class ProductEndpoints
      *      summary="Export products to CSV file",
      *      description="Returns a CSV file with all products",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\MediaType(
      *              mediaType="text/csv",
      *          )
      *      ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized")
      * )
      */

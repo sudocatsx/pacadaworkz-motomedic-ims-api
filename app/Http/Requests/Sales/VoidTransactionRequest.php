@@ -22,7 +22,7 @@ class VoidTransactionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sales_id' => 'required|integer'
+            'sales_id' => 'required|integer',
         ];
     }
 }

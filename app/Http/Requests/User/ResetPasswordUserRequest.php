@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\User;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class ResetPasswordUserRequest extends FormRequest
@@ -27,7 +27,7 @@ class ResetPasswordUserRequest extends FormRequest
             'new_password' => 'required_if:is_default_password,false|nullable|string|min:6',
 
             // if true ito, yung new_password input ay disabled. So NULL ang value ng new_password
-            'is_default_password' => 'required|boolean'
+            'is_default_password' => 'required|boolean',
         ];
     }
 
@@ -36,7 +36,7 @@ class ResetPasswordUserRequest extends FormRequest
         throw new HttpResponseException(response()->json([
             'success' => false,
             'message' => 'Validation errors',
-            'data' => $validator->errors()
+            'data' => $validator->errors(),
         ], 422));
     }
 }

@@ -19,7 +19,7 @@ class ProfileResource extends JsonResource
             'role' => $this->whenLoaded('role', function () {
                 return [
                     'id' => $this->role->id,
-                    'name' => $this->role->role_name
+                    'name' => $this->role->role_name,
                 ];
             }),
             'name' => $this->name,

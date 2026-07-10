@@ -26,7 +26,7 @@ class UpdateProfileRequest extends FormRequest
         return [
             'first_name' => 'sometimes|string|max:50',
             'last_name' => 'sometimes|string|max:50',
-            'name' => 'sometimes|string|min:1|max:50', //this is user.name hahaha xD!
+            'name' => 'sometimes|string|min:1|max:50', // this is user.name hahaha xD!
             'email' => [
                 'sometimes',
                 'email',

@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SalesTransaction extends Model
 {
@@ -25,14 +25,13 @@ class SalesTransaction extends Model
         'change',
     ];
 
-
-    //Entity Reletionship to the user
+    // Entity Reletionship to the user
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    //Entity Reletionship to the sales_items
+    // Entity Reletionship to the sales_items
     public function sales_items(): HasMany
     {
         return $this->hasMany(SalesItem::class, 'sales_transactions_id');
