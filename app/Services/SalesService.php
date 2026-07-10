@@ -78,6 +78,16 @@ class SalesService
                 $inventory = Inventory::where('product_id', $item->product_id)->first();
                 if ($inventory) {
                     $inventory->increment('quantity', $item->quantity);
+
+                    StockMovement::create([
+                        'product_id' => $item->product_id,
+                        'user_id' => $userId,
+                        'movement_type' => 'in',
+                        'quantity' => $item->quantity,
+                        'reference_type' => 'void',
+                        'reference_id' => $salesTransaction->id,
+                        'notes' => "Voided Sale - Transaction #{$salesTransaction->transaction_no}",
+                    ]);
                 }
             }
 

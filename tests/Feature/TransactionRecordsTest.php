@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -40,6 +41,51 @@ function transactionRecord(User $cashier, array $overrides = []): SalesTransacti
         'created_at' => Carbon::now(),
         'updated_at' => Carbon::now(),
     ], $overrides)));
+}
+
+function voidableTransactionItem(SalesTransaction $transaction, int $quantity = 3): int
+{
+    $now = Carbon::now();
+    $categoryId = DB::table('categories')->insertGetId([
+        'name' => 'Void Test Category',
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+    $brandId = DB::table('brands')->insertGetId([
+        'name' => 'Void Test Brand',
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+    $productId = DB::table('products')->insertGetId([
+        'category_id' => $categoryId,
+        'brand_id' => $brandId,
+        'sku' => 'VOID-TEST-001',
+        'name' => 'Item 2',
+        'unit_price' => 300,
+        'cost_price' => 200,
+        'reorder_level' => 2,
+        'is_active' => true,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    DB::table('inventory')->insert([
+        'product_id' => $productId,
+        'quantity' => 5,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+    DB::table('sales_items')->insert([
+        'sales_transactions_id' => $transaction->id,
+        'product_id' => $productId,
+        'quantity' => $quantity,
+        'quantity_returned' => 0,
+        'unit_price' => 300,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    return $productId;
 }
 
 test('transaction records return filters pagination and filtered kpis', function () {
@@ -122,4 +168,36 @@ test('authorized manager can refund a transaction created by another cashier', f
         ->assertJsonPath('data.refund_amount', 900);
 
     expect($transaction->fresh()->status)->toBe('refunded');
+});
+
+test('voiding a sale restores stock and records one inbound void movement per item', function () {
+    $admin = transactionUser('admin');
+    $cashier = transactionUser('staff');
+    $transaction = transactionRecord($cashier);
+    $productId = voidableTransactionItem($transaction, 3);
+
+    $this->actingAs($admin, 'api')
+        ->postJson("/api/v1/transactions/{$transaction->id}/void")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'voided');
+
+    expect(DB::table('inventory')->where('product_id', $productId)->value('quantity'))->toBe(8)
+        ->and(DB::table('stock_movements')
+            ->where('product_id', $productId)
+            ->where('reference_type', 'void')
+            ->where('reference_id', $transaction->id)
+            ->where('movement_type', 'in')
+            ->where('quantity', 3)
+            ->where('user_id', $admin->id)
+            ->count())->toBe(1);
+
+    $this->actingAs($admin, 'api')
+        ->postJson("/api/v1/transactions/{$transaction->id}/void")
+        ->assertOk();
+
+    expect(DB::table('inventory')->where('product_id', $productId)->value('quantity'))->toBe(8)
+        ->and(DB::table('stock_movements')
+            ->where('reference_type', 'void')
+            ->where('reference_id', $transaction->id)
+            ->count())->toBe(1);
 });
