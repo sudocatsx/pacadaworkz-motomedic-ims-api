@@ -32,6 +32,8 @@ class ApplyDiscountRequest extends FormRequest
                 // Rule::when($this->input('discount_type') === 'percentage', ['max:100']),
             ],
             'discount_type' => ['required', 'string', 'in:fixed,percentage'],
+            'authorizer_id' => ['required', 'integer', 'exists:users,id'],
+            'pin' => ['required', 'digits:6'],
         ];
     }
 

@@ -12,8 +12,9 @@ use App\Http\Requests\POS\Cart\UpdateCartItemRequest;
 use App\Http\Requests\POS\CheckoutRequest;
 use App\Http\Resources\CartItemResource;
 use App\Http\Resources\CartResource;
-use App\Http\Resources\ProductResource;
+use App\Http\Resources\PosProductResource;
 use App\Http\Resources\SalesTransactionResource;
+use App\Services\AuthorizationPinService;
 use App\Services\PosService;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,7 +22,7 @@ class PosController extends Controller
 {
     private $posService;
 
-    public function __construct(PosService $posService)
+    public function __construct(PosService $posService, private AuthorizationPinService $pins)
     {
         $this->posService = $posService;
     }
@@ -30,7 +31,7 @@ class PosController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => ProductResource::collection($this->posService->getProducts()),
+            'data' => PosProductResource::collection($this->posService->getProducts()),
         ]);
     }
 
@@ -193,6 +194,9 @@ class PosController extends Controller
         try {
             $validated = $request->validated();
             $userId = Auth::id();
+            $initiator = $request->user('api')->load('role.permissions');
+            $authorizer = $this->pins->authorize($initiator, (int) $validated['authorizer_id'], $validated['pin'], 'POS', 'Authorize Discount');
+            unset($validated['authorizer_id'], $validated['pin']);
 
             $cart = $this->posService->applyDiscount($userId, $validated);
             $result = $this->posService->getCart($userId); // recalculate summary after discount

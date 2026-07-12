@@ -25,18 +25,18 @@ class PermissionSeeder extends Seeder
             'Attributes' => ['View', 'Create', 'Edit', 'Delete'],
             'Suppliers' => ['View', 'Create', 'Edit', 'Delete'],
             'Purchases' => ['View', 'Create', 'Edit', 'Delete'],
-            'Users' => ['View', 'Create', 'Edit', 'Delete'],
+            'Users' => ['View', 'Create', 'Edit', 'Delete', 'Manage Lower Scope', 'Manage All'],
             'Roles' => ['View', 'Create', 'Edit', 'Delete'],
 
-            'POS' => ['Access', 'Create Transaction'],
+            'POS' => ['Access', 'Create Transaction', 'Request Discount', 'Authorize Discount'],
 
-            'Transactions' => ['View', 'Export', 'Refund', 'Void'],
+            'Transactions' => ['View', 'View Own', 'View All', 'Export', 'Request Refund', 'Request Void', 'Refund', 'Void'],
 
             'Reports' => ['View', 'Export'],
 
             'Activity Logs' => ['View Own', 'View All', 'Export'],
 
-            'Settings' => ['View', 'Edit'],
+            'Settings' => ['View', 'Edit', 'Manage Database'],
         ];
 
         foreach ($permissionSets as $module => $actions) {

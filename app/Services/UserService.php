@@ -19,7 +19,7 @@ class UserService
 
     public function getAllUsers(array $params)
     {
-        $query = User::query();
+        $query = User::with('role');
 
         /**
          * Searching Logic
@@ -36,6 +36,9 @@ class UserService
         // by role
         if (isset($params['role_id'])) {
             $query->where('role_id', $params['role_id']);
+        }
+        if (isset($params['allowed_role_ids'])) {
+            $query->whereIn('role_id', $params['allowed_role_ids']);
         }
         /**
          * Sorting Logic
@@ -169,6 +172,24 @@ class UserService
         }
 
         return false;
+    }
+
+    public function clearAuthorizationPinById(int $id, int $actorId): User
+    {
+        $user = User::find($id);
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
+
+        $user->update(['authorization_pin' => null]);
+        $this->activityLogService->log(
+            'Users',
+            'Clear authorization PIN',
+            "Cleared authorization PIN enrollment for {$user->email} (ID: {$user->id})",
+            $actorId
+        );
+
+        return $user;
     }
 
     public function changePasswordById(int $id, array $fields)

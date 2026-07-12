@@ -17,6 +17,10 @@ class SalesItem extends Model
         'quantity',
         'quantity_returned',
         'unit_price',
+        'unit_cost',
+        'allocated_discount',
+        'net_line_total',
+        'refunded_line_amount',
     ];
 
     // Entity Relationship to the sales_transaction

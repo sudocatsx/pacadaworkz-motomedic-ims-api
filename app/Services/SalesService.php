@@ -54,9 +54,9 @@ class SalesService
         return $salesTransaction;
     }
 
-    public function voidTransaction($userId, $salesId)
+    public function voidTransaction($userId, $salesId, ?string $reason = null, ?int $initiatorId = null)
     {
-        return DB::transaction(function () use ($userId, $salesId) {
+        return DB::transaction(function () use ($userId, $salesId, $reason, $initiatorId) {
             $salesTransaction = SalesTransaction::with('sales_items')
                 ->where('id', $salesId)
                 ->first();
@@ -72,6 +72,12 @@ class SalesService
             if (in_array($salesTransaction->status, ['refunded', 'partially_refunded'], true)) {
                 throw new InvalidRefundSalesTransactionException;
             }
+            if (! $salesTransaction->created_at->isSameDay(now())) {
+                throw new InvalidRefundSalesTransactionException('Only same-day transactions can be voided.');
+            }
+            if (! $reason) {
+                throw new InvalidRefundSalesTransactionException('A void reason is required.');
+            }
 
             // Restore stock
             foreach ($salesTransaction->sales_items as $item) {
@@ -86,7 +92,7 @@ class SalesService
                         'quantity' => $item->quantity,
                         'reference_type' => 'void',
                         'reference_id' => $salesTransaction->id,
-                        'notes' => "Voided Sale - Transaction #{$salesTransaction->transaction_no}",
+                        'notes' => "Voided Sale - Transaction #{$salesTransaction->transaction_no}: {$reason}",
                     ]);
                 }
             }
@@ -97,17 +103,17 @@ class SalesService
             $this->activityLogService->log(
                 module: 'Transactions',
                 action: 'Void transaction',
-                description: "Voided sales transaction #{$salesTransaction->transaction_no}",
-                userId: $userId
+                description: 'Initiator #'.($initiatorId ?? $userId)." authorized by #{$userId}; voided #{$salesTransaction->transaction_no}: {$reason}",
+                userId: $initiatorId ?? $userId
             );
 
             return $salesTransaction;
         });
     }
 
-    public function refundTransaction($userId, $salesId, $data)
+    public function refundTransaction($userId, $salesId, $data, ?int $initiatorId = null)
     {
-        return DB::transaction(function () use ($userId, $salesId, $data) {
+        return DB::transaction(function () use ($userId, $salesId, $data, $initiatorId) {
             $salesTransaction = SalesTransaction::with('sales_items')
                 ->where('id', $salesId)
                 ->first();
@@ -191,7 +197,13 @@ class SalesService
                     $item->quantity_returned += $qtyToRefund;
                     $item->save();
 
-                    $refundAmount += $item->unit_price * $qtyToRefund;
+                    $perUnitNet = $item->quantity > 0 ? ((float) $item->net_line_total / $item->quantity) : 0;
+                    $lineRefund = round($perUnitNet * $qtyToRefund, 2);
+                    $remainingLineAmount = (float) $item->net_line_total - (float) $item->refunded_line_amount;
+                    $lineRefund = min($lineRefund, $remainingLineAmount);
+                    $item->refunded_line_amount += $lineRefund;
+                    $item->save();
+                    $refundAmount += $lineRefund;
                 }
             }
 
@@ -212,8 +224,8 @@ class SalesService
             $this->activityLogService->log(
                 module: 'Transactions',
                 action: 'Refund',
-                description: "{$refundTypeDescription} refunded {$refundAmount} for sales transaction #{$salesTransaction->transaction_no}",
-                userId: $userId
+                description: 'Initiator #'.($initiatorId ?? $userId)." authorized by #{$userId}; {$refundTypeDescription} refunded {$refundAmount} for #{$salesTransaction->transaction_no}",
+                userId: $initiatorId ?? $userId
             );
 
             return $salesTransaction;

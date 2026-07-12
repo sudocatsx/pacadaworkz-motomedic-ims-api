@@ -27,7 +27,9 @@ class RefundTransactionRequest extends FormRequest
             'refund_items.*.quantity' => 'required_with:refund_items|integer|min:1',
             'refund_items.*.reason' => 'nullable|string',
             'refund_type' => 'nullable|string|in:full,partial',
-            'reason' => 'nullable|string',
+            'reason' => 'required|string|max:1000',
+            'authorizer_id' => 'required|integer|exists:users,id',
+            'pin' => 'required|digits:6',
         ];
     }
 }

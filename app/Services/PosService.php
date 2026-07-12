@@ -82,6 +82,7 @@ class PosService
         }
 
         $cart = $this->createCart($userId);
+        $cart->update(['discount' => 0, 'discount_type' => 'fixed']);
 
         $cart_item = $cart->cart_items()->where('product_id', $productId)->first();
 
@@ -138,6 +139,7 @@ class PosService
 
         $cartItem->quantity = $quantity;
         $cartItem->save();
+        $cart->update(['discount' => 0, 'discount_type' => 'fixed']);
 
         $cartItem->load('product.inventory');
 
@@ -162,6 +164,7 @@ class PosService
         }
 
         $cartItem->delete();
+        $cart->update(['discount' => 0, 'discount_type' => 'fixed']);
 
         $this->activityLogService->log(
             module: 'POS',
@@ -178,6 +181,7 @@ class PosService
         $cart = Cart::where('user_id', $userId)->firstOrFail();
 
         $cart->cart_items()->delete();
+        $cart->update(['discount' => 0, 'discount_type' => 'fixed']);
         $this->activityLogService->log(
             module: 'POS',
             action: 'clear carts',
@@ -271,12 +275,24 @@ class PosService
             ]);
 
             // create sales items along with its stock movement and deduct inventory stock
-            foreach ($cartItems as $item) {
+            $allocatedSoFar = 0.0;
+            $lastIndex = $cartItems->count() - 1;
+            foreach ($cartItems->values() as $index => $item) {
+                $product = Product::findOrFail($item->product_id);
+                $lineGross = (float) $item->unit_price * $item->quantity;
+                $allocatedDiscount = $index === $lastIndex
+                    ? round($discountAmount - $allocatedSoFar, 2)
+                    : round($subtotal > 0 ? $discountAmount * ($lineGross / $subtotal) : 0, 2);
+                $allocatedSoFar += $allocatedDiscount;
                 SalesItem::create([
                     'sales_transactions_id' => $transaction->id,
                     'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,
+                    'unit_cost' => $product->cost_price,
+                    'allocated_discount' => $allocatedDiscount,
+                    'net_line_total' => $lineGross - $allocatedDiscount,
+                    'refunded_line_amount' => 0,
                 ]);
 
                 StockMovement::create([

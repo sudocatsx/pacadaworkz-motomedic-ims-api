@@ -43,6 +43,7 @@ class User extends Authenticatable implements JWTSubject
         'is_active',
         'google_id',
         'theme',
+        'authorization_pin',
     ];
 
     /**
@@ -52,6 +53,7 @@ class User extends Authenticatable implements JWTSubject
      */
     protected $hidden = [
         'password',
+        'authorization_pin',
         // 'remember_token',
     ];
 
@@ -106,5 +108,12 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasOne(SystemSetting::class);
 
         return $this->hasOne(SystemSetting::class);
+    }
+
+    public function hasPermission(string $module, string $name): bool
+    {
+        return $this->role?->permissions->contains(
+            fn ($permission) => $permission->module === $module && $permission->name === $name
+        ) ?? false;
     }
 }

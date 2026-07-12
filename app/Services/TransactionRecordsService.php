@@ -50,7 +50,7 @@ class TransactionRecordsService
             ->get();
     }
 
-    public function dailyReport(string $date): array
+    public function dailyReport(string $date, ?int $userId = null): array
     {
         $timezone = config('app.timezone');
         $day = Carbon::createFromFormat('Y-m-d', $date, $timezone);
@@ -59,6 +59,9 @@ class TransactionRecordsService
             'start_date' => $day->toDateString(),
             'end_date' => $day->toDateString(),
         ];
+        if ($userId) {
+            $filters['user_id'] = $userId;
+        }
         $query = $this->filteredQuery($filters);
         $active = (clone $query)->where('status', '!=', 'voided');
         $grossSales = (float) (clone $active)->sum('subtotal');
@@ -104,6 +107,10 @@ class TransactionRecordsService
     private function filteredQuery(array $filters): Builder
     {
         $query = SalesTransaction::query();
+
+        if (! empty($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
 
         if (! empty($filters['search'])) {
             $like = '%'.mb_strtolower($filters['search']).'%';

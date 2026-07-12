@@ -8,6 +8,7 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -90,6 +91,7 @@ function voidableTransactionItem(SalesTransaction $transaction, int $quantity = 
 
 test('transaction records return filters pagination and filtered kpis', function () {
     $admin = transactionUser('admin');
+    $admin->update(['authorization_pin' => Hash::make('123456')]);
     transactionRecord($admin);
     transactionRecord($admin, [
         'transaction_no' => 'TXN-OLD',
@@ -155,6 +157,7 @@ test('exports csv and real xlsx while enforcing export permission', function () 
 
 test('authorized manager can refund a transaction created by another cashier', function () {
     $admin = transactionUser('admin');
+    $admin->update(['authorization_pin' => Hash::make('123456')]);
     $cashier = transactionUser('staff');
     $transaction = transactionRecord($cashier);
 
@@ -162,6 +165,8 @@ test('authorized manager can refund a transaction created by another cashier', f
         ->postJson("/api/v1/transactions/{$transaction->id}/refund", [
             'refund_type' => 'full',
             'reason' => 'Customer return',
+            'authorizer_id' => $admin->id,
+            'pin' => '123456',
         ])
         ->assertOk()
         ->assertJsonPath('data.status', 'refunded')
@@ -172,12 +177,13 @@ test('authorized manager can refund a transaction created by another cashier', f
 
 test('voiding a sale restores stock and records one inbound void movement per item', function () {
     $admin = transactionUser('admin');
+    $admin->update(['authorization_pin' => Hash::make('123456')]);
     $cashier = transactionUser('staff');
     $transaction = transactionRecord($cashier);
     $productId = voidableTransactionItem($transaction, 3);
 
     $this->actingAs($admin, 'api')
-        ->postJson("/api/v1/transactions/{$transaction->id}/void")
+        ->postJson("/api/v1/transactions/{$transaction->id}/void", ['reason' => 'Cashier error', 'authorizer_id' => $admin->id, 'pin' => '123456'])
         ->assertOk()
         ->assertJsonPath('data.status', 'voided');
 
@@ -192,7 +198,7 @@ test('voiding a sale restores stock and records one inbound void movement per it
             ->count())->toBe(1);
 
     $this->actingAs($admin, 'api')
-        ->postJson("/api/v1/transactions/{$transaction->id}/void")
+        ->postJson("/api/v1/transactions/{$transaction->id}/void", ['reason' => 'Cashier error', 'authorizer_id' => $admin->id, 'pin' => '123456'])
         ->assertOk();
 
     expect(DB::table('inventory')->where('product_id', $productId)->value('quantity'))->toBe(8)

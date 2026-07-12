@@ -3,6 +3,7 @@
 use App\Http\Controllers\API\ActivityLogController;
 use App\Http\Controllers\API\AttributeController;
 use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\AuthorizationController;
 use App\Http\Controllers\API\BrandController;
 use App\Http\Controllers\API\CatalogImportController;
 use App\Http\Controllers\API\CategoryController;
@@ -53,6 +54,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
             Route::get('/me', [AuthController::class, 'me']);
             Route::post('/refresh', [AuthController::class, 'refresh']);
+            Route::get('/authorizers', [AuthorizationController::class, 'authorizers']);
+            Route::put('/authorization-pin', [AuthorizationController::class, 'setPin']);
         });
 
         Route::group([], function () {
@@ -64,6 +67,8 @@ Route::prefix('v1')->group(function () {
             // Users
             Route::prefix('users')->middleware('modules:Users')->group(function () {
                 Route::get('/', [UserController::class, 'index'])->middleware('permissions:View');
+                Route::get('/assignable-roles', [UserController::class, 'assignableRoles'])->middleware('permissions:View');
+                Route::delete('/{id}/authorization-pin', [UserController::class, 'clearAuthorizationPin'])->middleware('permissions:Edit');
                 // modules middleware of users
                 Route::get('/{id}', [UserController::class, 'show'])->middleware('permissions:View');
                 Route::post('/', [UserController::class, 'store'])->middleware('permissions:Create');
@@ -174,7 +179,7 @@ Route::prefix('v1')->group(function () {
                     Route::patch('/update-item/{id}', [PosController::class, 'update'])->middleware('permissions:Access');
                     Route::delete('/remove-item/{id}', [PosController::class, 'delete'])->middleware('permissions:Access');
                     Route::post('/clear', [PosController::class, 'clearCart'])->middleware('permissions:Access');
-                    Route::post('/apply-discount', [PosController::class, 'applyDiscount'])->middleware('permissions:Access');
+                    Route::post('/apply-discount', [PosController::class, 'applyDiscount'])->middleware('permissions:POS.Request Discount,POS.Authorize Discount');
                 });
 
                 Route::post('/checkout', [PosController::class, 'checkoutCart'])->middleware('permissions:Create Transaction');
@@ -199,13 +204,13 @@ Route::prefix('v1')->group(function () {
             });
 
             Route::prefix('transactions')->middleware('modules:Transactions')->group(function () {
-                Route::get('/', [TransactionController::class, 'index'])->middleware('permissions:View');
-                Route::get('/daily-report', [TransactionController::class, 'dailyReport'])->middleware('permissions:View');
+                Route::get('/', [TransactionController::class, 'index'])->middleware('permissions:View,View Own,View All');
+                Route::get('/daily-report', [TransactionController::class, 'dailyReport'])->middleware('permissions:View,View Own,View All');
                 Route::get('/export', [TransactionController::class, 'export'])->middleware('permissions:Export');
-                Route::get('/{id}', [TransactionController::class, 'show'])->middleware('permissions:View');
-                Route::get('/{id}/receipt', [TransactionController::class, 'receipt'])->middleware('permissions:View');
-                Route::post('/{id}/refund', [TransactionController::class, 'refund'])->middleware('permissions:Refund');
-                Route::post('/{id}/void', [TransactionController::class, 'void'])->middleware('permissions:Void');
+                Route::get('/{id}', [TransactionController::class, 'show'])->middleware('permissions:View,View Own,View All');
+                Route::get('/{id}/receipt', [TransactionController::class, 'receipt'])->middleware('permissions:View,View Own,View All');
+                Route::post('/{id}/refund', [TransactionController::class, 'refund'])->middleware('permissions:Request Refund,Refund');
+                Route::post('/{id}/void', [TransactionController::class, 'void'])->middleware('permissions:Request Void,Void');
             });
 
             // Reports
@@ -228,7 +233,7 @@ Route::prefix('v1')->group(function () {
                         Route::patch('/', [SystemSettingController::class, 'update'])->middleware('permissions:Edit');
 
                         // Backup & Restore (Superadmin only)
-                        Route::middleware('role:superadmin')->group(function () {
+                        Route::middleware('permissions:Settings.Manage Database')->group(function () {
                             Route::get('/backup', [SystemSettingController::class, 'backup']);
                             Route::post('/restore', [SystemSettingController::class, 'restore']);
                         });
