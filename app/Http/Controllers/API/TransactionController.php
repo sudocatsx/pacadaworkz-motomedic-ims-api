@@ -128,7 +128,7 @@ class TransactionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => new SalesTransactionResource($transaction->load(['user', 'sales_items.product'])),
+                'data' => new SalesTransactionResource($transaction->load(['user', 'sales_items.product', 'authorizations'])),
                 'message' => 'Transaction refunded successfully.',
             ]);
         } catch (SalesTransactionNotFoundException $exception) {
@@ -149,7 +149,7 @@ class TransactionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => new SalesTransactionResource($transaction->load(['user', 'sales_items.product'])),
+                'data' => new SalesTransactionResource($transaction->load(['user', 'sales_items.product', 'authorizations'])),
                 'message' => 'Transaction voided successfully.',
             ]);
         } catch (SalesTransactionNotFoundException $exception) {

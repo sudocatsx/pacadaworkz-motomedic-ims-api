@@ -17,6 +17,7 @@ use App\Http\Resources\SalesTransactionResource;
 use App\Services\AuthorizationPinService;
 use App\Services\PosService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class PosController extends Controller
 {
@@ -214,18 +215,24 @@ class PosController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
             ], $e->getCode());
+        } catch (ValidationException $e) {
+            $errors = $e->errors();
+
+            return response()->json([
+                'success' => false,
+                'message' => $errors['pin'][0] ?? 'Authorization failed. Please check the selected authorizer and PIN.',
+                'errors' => $errors,
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('POS Apply Discount Error: '.$e->getMessage(), [
                 'user_id' => $userId,
-                'request' => $request->all(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error',
-                // 'message' => $e->getMessage(),
-            ], $e->getCode());
+                'message' => 'We could not apply the discount. Please try again.',
+            ], 500);
         }
     }
 

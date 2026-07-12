@@ -83,3 +83,23 @@ test('adding an item invalidates an already authorized discount', function () {
     $this->actingAs($staff, 'api')->getJson('/api/v1/pos/cart')
         ->assertOk()->assertJsonPath('data.summary.discount', 0)->assertJsonPath('data.summary.total', 2000);
 });
+
+test('invalid discount authorization returns a user friendly validation response', function () {
+    $staff = posTestUser('staff');
+    $manager = posTestUser('manager', ['authorization_pin' => Hash::make('123456')]);
+    $productId = posTestProduct(1000, 600);
+
+    $this->actingAs($staff, 'api')->postJson('/api/v1/pos/cart/add-item', ['product_id' => $productId, 'quantity' => 1])->assertCreated();
+
+    $this->actingAs($staff, 'api')->postJson('/api/v1/pos/cart/apply-discount', [
+        'discount' => 10, 'discount_type' => 'percentage', 'authorizer_id' => $manager->id, 'pin' => '000000',
+    ])->assertUnprocessable()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'The authorization PIN is invalid.')
+        ->assertJsonPath('errors.pin.0', 'The authorization PIN is invalid.')
+        ->assertJsonMissingPath('exception')
+        ->assertJsonMissingPath('trace');
+
+    $this->actingAs($staff, 'api')->getJson('/api/v1/pos/cart')
+        ->assertOk()->assertJsonPath('data.summary.discount', 0)->assertJsonPath('data.summary.total', 1000);
+});

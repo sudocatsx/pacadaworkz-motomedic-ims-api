@@ -170,7 +170,11 @@ test('authorized manager can refund a transaction created by another cashier', f
         ])
         ->assertOk()
         ->assertJsonPath('data.status', 'refunded')
-        ->assertJsonPath('data.refund_amount', 900);
+        ->assertJsonPath('data.refund_amount', 900)
+        ->assertJsonPath('data.authorization_history.0.action', 'refund')
+        ->assertJsonPath('data.authorization_history.0.initiator.id', $admin->id)
+        ->assertJsonPath('data.authorization_history.0.authorizer.id', $admin->id)
+        ->assertJsonPath('data.authorization_history.0.details.reason', 'Customer return');
 
     expect($transaction->fresh()->status)->toBe('refunded');
 });
@@ -185,7 +189,10 @@ test('voiding a sale restores stock and records one inbound void movement per it
     $this->actingAs($admin, 'api')
         ->postJson("/api/v1/transactions/{$transaction->id}/void", ['reason' => 'Cashier error', 'authorizer_id' => $admin->id, 'pin' => '123456'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'voided');
+        ->assertJsonPath('data.status', 'voided')
+        ->assertJsonPath('data.authorization_history.0.action', 'void')
+        ->assertJsonPath('data.authorization_history.0.authorizer.id', $admin->id)
+        ->assertJsonPath('data.authorization_history.0.details.reason', 'Cashier error');
 
     expect(DB::table('inventory')->where('product_id', $productId)->value('quantity'))->toBe(8)
         ->and(DB::table('stock_movements')
@@ -206,4 +213,43 @@ test('voiding a sale restores stock and records one inbound void movement per it
             ->where('reference_type', 'void')
             ->where('reference_id', $transaction->id)
             ->count())->toBe(1);
+});
+
+test('each partial refund creates a separate authorization history event', function () {
+    $staff = transactionUser('staff');
+    $manager = transactionUser('manager');
+    $manager->update(['authorization_pin' => Hash::make('123456')]);
+    $transaction = transactionRecord($staff);
+    $productId = voidableTransactionItem($transaction, 2);
+    $salesItemId = DB::table('sales_items')->where('sales_transactions_id', $transaction->id)->value('id');
+    DB::table('sales_items')->where('id', $salesItemId)->update([
+        'unit_price' => 500,
+        'unit_cost' => 300,
+        'allocated_discount' => 100,
+        'net_line_total' => 900,
+        'refunded_line_amount' => 0,
+    ]);
+
+    foreach (['First returned item', 'Second returned item'] as $reason) {
+        $this->actingAs($staff, 'api')->postJson("/api/v1/transactions/{$transaction->id}/refund", [
+            'refund_type' => 'partial',
+            'reason' => $reason,
+            'refund_items' => [['sales_item_id' => $salesItemId, 'quantity' => 1]],
+            'authorizer_id' => $manager->id,
+            'pin' => '123456',
+        ])->assertOk();
+    }
+
+    $this->actingAs($staff, 'api')->getJson("/api/v1/transactions/{$transaction->id}")
+        ->assertOk()
+        ->assertJsonCount(2, 'data.authorization_history')
+        ->assertJsonPath('data.authorization_history.0.details.reason', 'First returned item')
+        ->assertJsonPath('data.authorization_history.0.details.refund_amount', 450)
+        ->assertJsonPath('data.authorization_history.1.details.reason', 'Second returned item')
+        ->assertJsonPath('data.authorization_history.1.details.refund_amount', 450)
+        ->assertJsonPath('data.authorization_history.0.initiator.id', $staff->id)
+        ->assertJsonPath('data.authorization_history.0.authorizer.id', $manager->id);
+
+    expect(DB::table('inventory')->where('product_id', $productId)->value('quantity'))->toBe(7)
+        ->and(DB::table('transaction_authorizations')->where('sales_transaction_id', $transaction->id)->count())->toBe(2);
 });

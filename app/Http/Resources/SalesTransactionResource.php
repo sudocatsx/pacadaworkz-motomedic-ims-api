@@ -38,6 +38,7 @@ class SalesTransactionResource extends JsonResource
             'net_sales' => max(0, (float) $this->total_amount - (float) ($this->refund_amount ?? 0)),
             'created_at' => $this->created_at,
             'sales_item' => SalesItemResource::collection($this->whenLoaded('sales_items')),
+            'authorization_history' => TransactionAuthorizationResource::collection($this->whenLoaded('authorizations')),
         ];
     }
 }

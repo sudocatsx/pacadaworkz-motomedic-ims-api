@@ -54,4 +54,9 @@ class SalesTransaction extends Model
     {
         return $this->hasMany(SalesItem::class, 'sales_transactions_id');
     }
+
+    public function authorizations(): HasMany
+    {
+        return $this->hasMany(TransactionAuthorization::class)->orderBy('authorized_at');
+    }
 }
