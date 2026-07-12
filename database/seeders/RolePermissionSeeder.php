@@ -30,7 +30,7 @@ class RolePermissionSeeder extends Seeder
         $roleMatrices = [
             'superadmin' => $permissions->pluck('id'),
             'admin' => $permissionIds([
-                'Dashboard' => ['View', 'Create'],
+                'Dashboard' => ['View', 'View Financial Data', 'Create'],
                 'Products' => ['View', 'Create', 'Edit', 'Adjust Stock', 'Delete', 'Import', 'Export'],
                 'Categories' => ['View', 'Create', 'Edit', 'Delete'],
                 'Brands' => ['View', 'Create', 'Edit', 'Delete'],

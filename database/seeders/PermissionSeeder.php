@@ -17,7 +17,7 @@ class PermissionSeeder extends Seeder
         $permissions = [];
 
         $permissionSets = [
-            'Dashboard' => ['View', 'Create'],
+            'Dashboard' => ['View', 'View Financial Data', 'Create'],
 
             'Products' => ['View', 'Create', 'Edit', 'Adjust Stock', 'Delete', 'Import', 'Export'],
             'Categories' => ['View', 'Create', 'Edit', 'Delete'],

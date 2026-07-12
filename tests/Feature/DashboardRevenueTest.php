@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Carbon\Carbon;
@@ -25,6 +26,20 @@ function dashboardUserForRole(string $roleName = 'admin'): User
     return User::factory()->create([
         'role_id' => $role->id,
     ]);
+}
+
+function dashboardUserWithPermissions(string $roleName, array $permissionNames): User
+{
+    $role = Role::create([
+        'role_name' => $roleName,
+        'description' => 'Dashboard permission test role',
+    ]);
+    $permissionIds = Permission::where('module', 'Dashboard')
+        ->whereIn('name', $permissionNames)
+        ->pluck('id');
+    $role->permissions()->attach($permissionIds);
+
+    return User::factory()->create(['role_id' => $role->id]);
 }
 
 function createDashboardRevenueProduct(
@@ -269,4 +284,116 @@ test('dashboard top products only counts sales from the last seven days', functi
         ->assertJsonPath('data.Recent Product', 5)
         ->assertJsonPath('data.Old Product', 0)
         ->assertJsonPath('data.Voided Top Product', 0);
+});
+
+test('operational dashboard stats are scoped to the authenticated employee and omit financial fields', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
+
+    $cashier = dashboardUserForRole('staff');
+    $otherCashier = dashboardUserForRole('staff');
+    $productId = createDashboardRevenueProduct('Scope Category', 'Scope Brand', 'Scope Product', 'SCOPE-001');
+
+    createDashboardSalesItem($cashier, $productId, 'completed', 4, 1, 100, '2026-07-08 09:00:00');
+    createDashboardSalesItem($otherCashier, $productId, 'completed', 9, 2, 100, '2026-07-08 10:00:00');
+
+    $response = $this->actingAs($cashier, 'api')->getJson('/api/v1/dashboard/stats');
+
+    $response->assertOk()
+        ->assertJsonPath('data.my_transactions_today', 1)
+        ->assertJsonPath('data.my_items_sold_today', 3);
+
+    foreach ([
+        'todays_sales', 'todays_transactions', 'todays_items_sold', 'todays_purchases',
+        'todays_cost_of_goods_sold', 'todays_stock_adjustment_losses', 'todays_net_profit',
+        'total_products', 'total_revenue', 'total_transactions', 'total_sales', 'active_users',
+    ] as $field) {
+        $response->assertJsonMissingPath('data.'.$field);
+    }
+});
+
+test('operational dashboard users cannot access financial chart endpoints', function () {
+    $staff = dashboardUserForRole('staff');
+
+    foreach ([
+        '/api/v1/dashboard/charts/sales-trend',
+        '/api/v1/dashboard/charts/revenue-by-category',
+        '/api/v1/dashboard/charts/revenue-by-brand',
+        '/api/v1/dashboard/charts/inventory-overview',
+    ] as $endpoint) {
+        $this->actingAs($staff, 'api')->getJson($endpoint)->assertForbidden();
+    }
+});
+
+test('built-in financial roles and a custom role with both permissions receive financial access', function () {
+    $users = [
+        dashboardUserForRole('admin'),
+        dashboardUserForRole('superadmin'),
+        dashboardUserWithPermissions('dashboard-analyst', ['View', 'View Financial Data']),
+    ];
+
+    foreach ($users as $user) {
+        $this->actingAs($user, 'api')
+            ->getJson('/api/v1/dashboard/stats')
+            ->assertOk()
+            ->assertJsonStructure(['data' => [
+                'my_transactions_today', 'my_items_sold_today', 'low_stock', 'out_of_stock',
+                'todays_sales', 'todays_purchases', 'todays_net_profit', 'total_revenue',
+            ]]);
+
+        $this->actingAs($user, 'api')
+            ->getJson('/api/v1/dashboard/charts/sales-trend')
+            ->assertOk();
+    }
+});
+
+test('financial permission without dashboard view is not sufficient for any dashboard endpoint', function () {
+    $user = dashboardUserWithPermissions('financial-without-dashboard', ['View Financial Data']);
+
+    foreach ([
+        '/api/v1/dashboard/stats',
+        '/api/v1/dashboard/charts/top-products',
+        '/api/v1/dashboard/recent-activities',
+        '/api/v1/dashboard/charts/sales-trend',
+    ] as $endpoint) {
+        $this->actingAs($user, 'api')->getJson($endpoint)->assertForbidden();
+    }
+});
+
+test('operational users retain unit-based top products and own-only recent activity', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
+
+    $cashier = dashboardUserForRole('staff');
+    $otherCashier = dashboardUserForRole('staff');
+    $productId = createDashboardRevenueProduct('Ops Category', 'Ops Brand', 'Ops Product', 'OPS-001');
+    createDashboardSalesItem($cashier, $productId, 'completed', 6, 2, 500, '2026-07-08 09:00:00');
+
+    DB::table('activity_logs')->insert([
+        [
+            'user_id' => $cashier->id,
+            'action' => 'checkout',
+            'module' => 'POS',
+            'description' => 'Own cashier activity',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'user_id' => $otherCashier->id,
+            'action' => 'checkout',
+            'module' => 'POS',
+            'description' => 'Other cashier activity',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    $this->actingAs($cashier, 'api')
+        ->getJson('/api/v1/dashboard/charts/top-products')
+        ->assertOk()
+        ->assertJsonPath('data.Ops Product', 4);
+
+    $this->actingAs($cashier, 'api')
+        ->getJson('/api/v1/dashboard/recent-activities')
+        ->assertOk()
+        ->assertJsonFragment(['description' => 'Own cashier activity'])
+        ->assertJsonMissing(['description' => 'Other cashier activity']);
 });

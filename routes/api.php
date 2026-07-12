@@ -208,13 +208,6 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{id}/void', [TransactionController::class, 'void'])->middleware('permissions:Void');
             });
 
-            // Dashboard
-            Route::prefix('dashboard')->middleware('modules:Dashboard')->group(function () {
-                Route::get('/charts/inventory-overview', [DashboardController::class, 'showInventoryOverview'])->middleware('permissions:View');
-                Route::get('/charts/revenue-by-category', [DashboardController::class, 'showRevenueByCategory'])->middleware('permissions:View');
-                Route::get('/charts/revenue-by-brand', [DashboardController::class, 'showRevenueByBrand'])->middleware('permissions:View');
-            });
-
             // Reports
             Route::prefix('reports')->middleware('modules:Reports')->group(function () {
                 Route::get('/sales', [ReportsController::class, 'showSalesReport'])->middleware('permissions:View');
@@ -245,11 +238,17 @@ Route::prefix('v1')->group(function () {
         });
 
         // Dashboard
-        Route::prefix('dashboard')->middleware('modules:Dashboard')->group(function () {
-            Route::get('/stats', [DashboardController::class, 'showStats'])->middleware('permissions:View');
-            Route::get('/charts/sales-trend', [DashboardController::class, 'showSalesTrend'])->middleware('permissions:View');
-            Route::get('/charts/top-products', [DashboardController::class, 'showTopProducts'])->middleware('permissions:View');
-            Route::get('/recent-activities', [DashboardController::class, 'showRecentActivities'])->middleware('permissions:View');
+        Route::prefix('dashboard')->middleware('permissions:Dashboard.View')->group(function () {
+            Route::get('/stats', [DashboardController::class, 'showStats']);
+            Route::get('/charts/top-products', [DashboardController::class, 'showTopProducts']);
+            Route::get('/recent-activities', [DashboardController::class, 'showRecentActivities']);
+
+            Route::middleware('permissions:Dashboard.View Financial Data')->group(function () {
+                Route::get('/charts/sales-trend', [DashboardController::class, 'showSalesTrend']);
+                Route::get('/charts/inventory-overview', [DashboardController::class, 'showInventoryOverview']);
+                Route::get('/charts/revenue-by-category', [DashboardController::class, 'showRevenueByCategory']);
+                Route::get('/charts/revenue-by-brand', [DashboardController::class, 'showRevenueByBrand']);
+            });
         });
 
         // Settings
