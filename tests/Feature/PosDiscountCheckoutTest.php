@@ -46,12 +46,14 @@ test('authorized discount survives cart refresh and checkout stores discounted f
     $this->actingAs($staff, 'api')->postJson('/api/v1/pos/cart/apply-discount', [
         'discount' => 5, 'discount_type' => 'percentage', 'authorizer_id' => $manager->id, 'pin' => '123456',
     ])->assertOk()
+        ->assertJsonPath('data.cart.discount', 5)
+        ->assertJsonPath('data.cart.discount_type', 'percentage')
         ->assertJsonPath('data.summary.subtotal', 2400)
         ->assertJsonPath('data.summary.discount', 120)
         ->assertJsonPath('data.summary.total', 2280);
 
     $this->actingAs($staff, 'api')->getJson('/api/v1/pos/cart')
-        ->assertOk()->assertJsonPath('data.summary.total', 2280);
+        ->assertOk()->assertJsonPath('data.cart.discount', 5)->assertJsonPath('data.summary.total', 2280);
 
     $checkout = $this->actingAs($staff, 'api')->postJson('/api/v1/pos/checkout', [
         'payment_method' => 'cash', 'amount_tendered' => 2300,

@@ -18,6 +18,8 @@ class CartResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
+            'discount' => (float) $this->discount,
+            'discount_type' => $this->discount_type,
             'cart_items' => CartItemResource::collection($this->whenLoaded('cart_items')),
         ];
     }

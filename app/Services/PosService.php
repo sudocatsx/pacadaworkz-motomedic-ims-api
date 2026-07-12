@@ -82,7 +82,6 @@ class PosService
         }
 
         $cart = $this->createCart($userId);
-        $cart->update(['discount' => 0, 'discount_type' => 'fixed']);
 
         $cart_item = $cart->cart_items()->where('product_id', $productId)->first();
 
@@ -99,6 +98,7 @@ class PosService
                 'unit_price' => intval($product->unit_price),
             ]);
         }
+        $cart->update(['discount' => 0, 'discount_type' => 'fixed']);
 
         // find name first of the product
         $name = $product->name;
