@@ -231,6 +231,72 @@ test('custom report period uses explicit start and end dates', function () {
         ->assertJsonPath('data.trend.4.total', 200);
 });
 
+test('custom report period requires a complete valid historical date range', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-13 12:00:00'));
+    $user = reportsUserForRole();
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?period=custom')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date', 'end_date']);
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=2026-07-10')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=2026-07-10&end_date=2026-07-01')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=2026-07-10&end_date=2026-07-14')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+});
+
+test('long sales report ranges use bounded zero-filled monthly trends', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-13 12:00:00'));
+    $user = reportsUserForRole();
+
+    createSalesTransactionForDate($user, '1975-01-15 10:00:00', 100);
+    createSalesTransactionForDate($user, '2026-07-01 10:00:00', 200);
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=1975-01-01&end_date=2026-07-13')
+        ->assertOk()
+        ->assertJsonPath('data.total_sales', 300)
+        ->assertJsonPath('data.trend_granularity', 'monthly')
+        ->assertJsonPath('data.trend.0.date', '1975-01')
+        ->assertJsonPath('data.trend.0.total', 100)
+        ->assertJsonPath('data.trend.618.date', '2026-07')
+        ->assertJsonPath('data.trend.618.total', 200);
+
+    expect($response->json('data.trend'))->toHaveCount(619);
+});
+
+test('long purchase report ranges use the same monthly trend strategy', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-13 12:00:00'));
+    $user = reportsUserForRole();
+    $supplier = Supplier::create(['name' => 'Monthly Trend Supplier']);
+
+    createPurchaseOrderForDate($user, $supplier, '2024-01-15 10:00:00', 500);
+    createPurchaseOrderForDate($user, $supplier, '2026-07-01 10:00:00', 700);
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/purchases?start_date=2024-01-01&end_date=2026-07-13')
+        ->assertOk()
+        ->assertJsonPath('data.total_purchases', 1200)
+        ->assertJsonPath('data.trend_granularity', 'monthly')
+        ->assertJsonPath('data.trend.0.date', '2024-01')
+        ->assertJsonPath('data.trend.0.total', 500)
+        ->assertJsonPath('data.trend.30.date', '2026-07')
+        ->assertJsonPath('data.trend.30.total', 700);
+
+    expect($response->json('data.trend'))->toHaveCount(31);
+});
+
 test('purchase report groups totals by supplier from backend data', function () {
     Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
 

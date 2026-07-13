@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Http\Requests\Reports\ReportDateRangeRequest;
 use App\Services\ReportsService;
 use App\Services\SpreadsheetService;
 use Carbon\Carbon;
@@ -63,7 +64,7 @@ class ReportsController extends Controller
     }
 
     // show all sales report
-    public function showSalesReport(Request $request)
+    public function showSalesReport(ReportDateRangeRequest $request)
     {
         try {
 
@@ -83,7 +84,7 @@ class ReportsController extends Controller
     }
 
     // show all purchases
-    public function showPurchases(Request $request)
+    public function showPurchases(ReportDateRangeRequest $request)
     {
         try {
             [$start, $end] = $this->resolveDateRange($request);
@@ -104,7 +105,7 @@ class ReportsController extends Controller
     }
 
     // show inventory
-    public function showInventory(Request $request)
+    public function showInventory(ReportDateRangeRequest $request)
     {
         try {
             [$start, $end] = $this->resolveDateRange($request);
@@ -123,7 +124,7 @@ class ReportsController extends Controller
     }
 
     // show performance
-    public function showPerformance(Request $request)
+    public function showPerformance(ReportDateRangeRequest $request)
     {
         try {
             [$start, $end] = $this->resolveDateRange($request);
@@ -143,7 +144,7 @@ class ReportsController extends Controller
     }
 
     // show stock adjustments
-    public function showStockAdjustments(Request $request)
+    public function showStockAdjustments(ReportDateRangeRequest $request)
     {
         try {
             [$start, $end] = $this->resolveDateRange($request);
@@ -163,7 +164,7 @@ class ReportsController extends Controller
     }
 
     // profit loss
-    public function showProfitLossReport(Request $request)
+    public function showProfitLossReport(ReportDateRangeRequest $request)
     {
         try {
             [$start, $end] = $this->resolveDateRange($request);
@@ -181,7 +182,7 @@ class ReportsController extends Controller
         }
     }
 
-    public function export($type, Request $request)
+    public function export($type, ReportDateRangeRequest $request)
     {
         try {
             [$start, $end] = $this->resolveDateRange($request);

@@ -36,21 +36,29 @@ class ReportsService
         return [$start, $end];
     }
 
-    private function dailyTrendSeries(Carbon $start, Carbon $end, $totals)
+    private function trendSeries(Carbon $start, Carbon $end, $totals): array
     {
-        $totalsByDate = collect($totals)->keyBy('date');
+        $isDaily = $start->diffInDays($end) + 1 <= 366;
+        $format = $isDaily ? 'Y-m-d' : 'Y-m';
+        $interval = $isDaily ? '1 day' : '1 month';
+        $periodStart = $isDaily ? $start->copy()->startOfDay() : $start->copy()->startOfMonth();
+        $periodEnd = $isDaily ? $end->copy()->startOfDay() : $end->copy()->startOfMonth();
+        $totalsByPeriod = collect($totals)
+            ->groupBy(fn ($row) => Carbon::parse($row->date)->format($format))
+            ->map(fn ($rows) => (float) $rows->sum('total'));
 
-        return collect(CarbonPeriod::create($start->copy()->startOfDay(), $end->copy()->startOfDay()))
-            ->map(function (Carbon $date) use ($totalsByDate) {
-                $dateKey = $date->toDateString();
-                $total = $totalsByDate->get($dateKey)->total ?? 0;
+        $trend = collect(CarbonPeriod::create($periodStart, $interval, $periodEnd))
+            ->map(function (Carbon $date) use ($format, $totalsByPeriod) {
+                $dateKey = $date->format($format);
 
                 return (object) [
                     'date' => $dateKey,
-                    'total' => (float) $total,
+                    'total' => (float) ($totalsByPeriod->get($dateKey) ?? 0),
                 ];
             })
             ->values();
+
+        return [$trend, $isDaily ? 'daily' : 'monthly'];
     }
 
     // sales report
@@ -67,7 +75,7 @@ class ReportsService
             ->groupBy('date')
             ->orderBy('date')
             ->get();
-        $trend = $this->dailyTrendSeries($start, $end, $trendTotals);
+        [$trend, $trendGranularity] = $this->trendSeries($start, $end, $trendTotals);
 
         $staffNameExpression = "COALESCE(NULLIF(users.name, ''), NULLIF(TRIM(users.first_name || ' ' || users.last_name), ''), 'Unknown Staff')";
         $salesByStaff = DB::table('sales_transactions')
@@ -90,6 +98,7 @@ class ReportsService
             'transactions' => $query->count(),
             'average_transaction' => round($query->avg('total_amount'), 2),
             'trend' => $trend,
+            'trend_granularity' => $trendGranularity,
             'sales_by_staff' => $salesByStaff,
         ];
     }
@@ -111,7 +120,7 @@ class ReportsService
             ->groupBy('date')
             ->orderBy('date')
             ->get();
-        $trend = $this->dailyTrendSeries($start, $end, $trendTotals);
+        [$trend, $trendGranularity] = $this->trendSeries($start, $end, $trendTotals);
 
         $purchaseBySupplier = DB::table('purchase_orders')
             ->leftJoin('suppliers', 'purchase_orders.supplier_id', '=', 'suppliers.id')
@@ -129,6 +138,7 @@ class ReportsService
             'purchase_orders' => $ordersQuery->count(),
             'average_orders' => $averageOrder,
             'trend' => $trend,
+            'trend_granularity' => $trendGranularity,
             'purchase_by_supplier' => $purchaseBySupplier,
         ];
     }
