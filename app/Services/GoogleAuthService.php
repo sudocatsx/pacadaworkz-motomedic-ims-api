@@ -41,6 +41,7 @@ class GoogleAuthService
         // 3. update google_id field ni user
         $user->update([
             'google_id' => $googleId,
+            'last_login' => now(),
         ]);
 
         $tokens = $this->generateJWTTokens($user);

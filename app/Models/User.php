@@ -44,6 +44,7 @@ class User extends Authenticatable implements JWTSubject
         'google_id',
         'theme',
         'authorization_pin',
+        'last_login',
     ];
 
     /**
@@ -67,6 +68,7 @@ class User extends Authenticatable implements JWTSubject
         return [
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'last_login' => 'datetime',
         ];
     }
 

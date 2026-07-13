@@ -27,6 +27,7 @@ class UserResource extends JsonResource
             'last_name' => $this->last_name,
             'contact_number' => $this->contact_number,
             'is_active' => $this->is_active,
+            'last_login' => $this->last_login?->toISOString(),
             'authorization_pin_configured' => filled($this->authorization_pin),
         ];
     }

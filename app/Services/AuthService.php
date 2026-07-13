@@ -28,6 +28,8 @@ class AuthService
         // Get authenticated user
         $user = auth('api')->user();
 
+        $user->update(['last_login' => now()]);
+
         // Refresh token 15 days
         $refreshToken = auth('api')->setTTL(21600)->fromUser($user);
 

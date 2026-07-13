@@ -36,6 +36,8 @@ test('valid credentials can login, fetch current user, refresh, and logout', fun
             'data' => ['access_token', 'refresh_token', 'token_type', 'expires_in'],
         ]);
 
+    expect($user->fresh()->last_login)->not->toBeNull();
+
     $accessToken = $login->json('data.access_token');
     $refreshToken = $login->json('data.refresh_token');
 
