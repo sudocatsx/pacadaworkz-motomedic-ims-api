@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use App\Models\ActivityLog;
@@ -10,34 +11,33 @@ use Illuminate\Support\Collection;
 
 class ActivityLogService
 {
+    public function log(
+        string $module,
+        string $action,
+        string $description,
+        ?int $userId = null // make it explicitly nullable
+    ) {
+        // Use provided userId or fallback to auth()->id()
+        $userId = $userId ?? auth()->id();
 
-public function log(
-    string $module,
-    string $action,
-    string $description,
-    ?int $userId = null // make it explicitly nullable
-) {
-    // Use provided userId or fallback to auth()->id()
-    $userId = $userId ?? auth()->id();
+        //  if still null, skip or throw exception to avoid DB error
+        if (! $userId) {
+            // Option 1: skip logging
+            return;
 
-    //  if still null, skip or throw exception to avoid DB error
-    if (!$userId) {
-        // Option 1: skip logging
-        return;
+            // Option 2: throw exception
+            // throw new \Exception("Cannot log activity: user_id is null");
+        }
 
-        // Option 2: throw exception
-        // throw new \Exception("Cannot log activity: user_id is null");
+        ActivityLog::create([
+            'user_id' => $userId,
+            'module' => $module,
+            'action' => $action,
+            'description' => $description,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
     }
-
-    ActivityLog::create([
-        'user_id'     => $userId,
-        'module'      => $module,
-        'action'      => $action,
-        'description' => $description,
-        'ip_address'  => request()->ip(),
-        'user_agent'  => request()->userAgent(),
-    ]);
-}
 
     public function getLogs(array $filters, User $user, bool $canViewAll): LengthAwarePaginator
     {
@@ -98,19 +98,19 @@ public function log(
     {
         $query = $this->scopeQueryForUser(ActivityLog::with('user'), $user, $canViewAll);
 
-        if ($canViewAll && !empty($filters['user_id'])) {
+        if ($canViewAll && ! empty($filters['user_id'])) {
             $query->where('user_id', (int) $filters['user_id']);
         }
 
-        if (!empty($filters['module'])) {
+        if (! empty($filters['module'])) {
             $query->where('module', $filters['module']);
         }
 
-        if (!empty($filters['action'])) {
+        if (! empty($filters['action'])) {
             $query->where('action', $filters['action']);
         }
 
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = mb_strtolower($filters['search']);
             $like = "%{$search}%";
 
@@ -132,7 +132,7 @@ public function log(
 
     private function scopeQueryForUser(Builder $query, User $user, bool $canViewAll): Builder
     {
-        if (!$canViewAll) {
+        if (! $canViewAll) {
             $query->where('user_id', $user->id);
         }
 

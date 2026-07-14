@@ -19,7 +19,7 @@ return new class extends Migration
             $table->timestamp('last_stock_in')->nullable();
             $table->timestamps();
             $table->softDeletes();
-           
+
         });
     }
 

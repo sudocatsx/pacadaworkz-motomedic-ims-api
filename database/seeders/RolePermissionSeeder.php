@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -29,28 +29,27 @@ class RolePermissionSeeder extends Seeder
 
         $roleMatrices = [
             'superadmin' => $permissions->pluck('id'),
-            'admin' => $permissionIds([
-                'Dashboard' => ['View', 'Create'],
-                'Inventory' => ['View', 'Create', 'Edit', 'Delete'],
-                'Products' => ['View', 'Create', 'Edit', 'Delete'],
+            'admin' => $permissions->pluck('id'),
+            'manager' => $permissionIds([
+                'Dashboard' => ['View', 'View Financial Data'],
+                'Products' => ['View', 'Create', 'Edit', 'Adjust Stock', 'Delete', 'Import', 'Export'],
                 'Categories' => ['View', 'Create', 'Edit', 'Delete'],
                 'Brands' => ['View', 'Create', 'Edit', 'Delete'],
                 'Attributes' => ['View', 'Create', 'Edit', 'Delete'],
                 'Suppliers' => ['View', 'Create', 'Edit', 'Delete'],
                 'Purchases' => ['View', 'Create', 'Edit', 'Delete'],
-                'Users' => ['View', 'Create', 'Edit', 'Delete'],
-                'Roles' => ['View', 'Create', 'Edit', 'Delete'],
-                'POS' => ['Access', 'Create Transaction'],
+                'Users' => ['View', 'Create', 'Edit', 'Manage Lower Scope'],
+                'POS' => ['Access', 'Create Transaction', 'Request Discount', 'Authorize Discount'],
+                'Transactions' => ['View Own', 'View All', 'Export', 'Request Refund', 'Request Void', 'Refund', 'Void'],
                 'Reports' => ['View', 'Export'],
                 'Activity Logs' => ['View All', 'Export'],
                 'Settings' => ['View', 'Edit'],
             ]),
             'staff' => $permissionIds([
                 'Dashboard' => ['View'],
-                'Inventory' => ['View'],
-                'Products' => ['View'],
-                'Purchases' => ['View', 'Create'],
-                'POS' => ['Access', 'Create Transaction'],
+                'POS' => ['Access', 'Create Transaction', 'Request Discount'],
+                'Transactions' => ['View Own', 'Request Refund', 'Request Void'],
+                'Settings' => ['View'],
             ]),
         ];
 

@@ -7,6 +7,16 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Project Setup
+
+Product images are stored on Laravel's `public` filesystem disk. After installing the API and whenever deploying to a new environment, expose that disk with:
+
+```bash
+php artisan storage:link
+```
+
+Set `APP_URL` to the public API origin so product image URLs returned to the React app and POS resolve correctly.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

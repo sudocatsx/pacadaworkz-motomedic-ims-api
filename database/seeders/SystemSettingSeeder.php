@@ -13,14 +13,14 @@ class SystemSettingSeeder extends Seeder
     public function run(): void
     {
         $settings = [
-            'business_name' => 'PacadaWorkz Moto Medic',
+            'business_name' => 'Pacadaworkz Moto Medic',
             'business_address' => '10A 5th St East Grace Park, Caloocan, Philippines',
             'contact_info' => 'pacadaworkz2021@gmail.com',
             'business_phone' => '0917-123-4567', // Placeholder generic phone if needed
             'currency_symbol' => '₱',
             'footer_message' => 'Thank you for your business!',
             'return_policy' => 'No return, no exchange.',
-            'logo_url' => null, 
+            'logo_url' => null,
         ];
 
         foreach ($settings as $key => $value) {
@@ -28,7 +28,7 @@ class SystemSettingSeeder extends Seeder
                 ['setting_key' => $key],
                 [
                     'setting_value' => $value,
-                    'description' => $this->getDescription($key)
+                    'description' => $this->getDescription($key),
                 ]
             );
         }

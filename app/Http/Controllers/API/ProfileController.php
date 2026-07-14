@@ -8,8 +8,6 @@ use App\Http\Requests\Settings\Profile\UpdateThemeRequest;
 use App\Http\Requests\Settings\Security\ChangePasswordRequest;
 use App\Http\Resources\ProfileResource;
 use App\Services\UserService;
-
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ProfileController
@@ -31,26 +29,25 @@ class ProfileController
             return response()->json([
                 'success' => true,
                 'data' => ProfileResource::make($response),
-                'message' => 'User profile retrieved succesfully'
+                'message' => 'User profile retrieved succesfully',
             ]);
         } catch (UserNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Settings Profile [GET] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile [GET] Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ]);
         }
     }
-
 
     public function updateProfile(UpdateProfileRequest $request)
     {
@@ -61,7 +58,7 @@ class ProfileController
             return response()->json([
                 'success' => true,
                 'data' => $response,
-                'message' => 'User profile updated successfully'
+                'message' => 'User profile updated successfully',
             ]);
         } catch (UserNotFoundException $e) {
             return response()->json([
@@ -69,14 +66,14 @@ class ProfileController
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Settings Profile [PATCH] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile [PATCH] Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -97,14 +94,14 @@ class ProfileController
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Settings Profile Password [PATCH] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Profile Password [PATCH] Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -117,7 +114,7 @@ class ProfileController
 
             return response()->json([
                 'success' => true,
-                'message' => 'Theme updated successfully'
+                'message' => 'Theme updated successfully',
             ]);
         } catch (UserNotFoundException $e) {
             return response()->json([
@@ -125,14 +122,14 @@ class ProfileController
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Settings Theme [PATCH] Error: ' . $e->getMessage(), [
+            \Log::error('Settings Theme [PATCH] Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }

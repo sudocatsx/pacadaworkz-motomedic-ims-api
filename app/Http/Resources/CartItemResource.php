@@ -4,7 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\ProductResource;
+use Illuminate\Support\Facades\Storage;
 
 class CartItemResource extends JsonResource
 {
@@ -25,8 +25,10 @@ class CartItemResource extends JsonResource
                 'sku' => $this->product->sku,
                 'name' => $this->product->name,
                 // 'unit_price' => $this->product->unit_price,
-                'image_url' => $this->product->image_url,
-                'current_stock' => $this->product->inventory?->quantity - $this->quantity
+                'image_url' => $this->product->image_url
+                    ? Storage::disk('public')->url(ltrim(str_replace('/storage/', '', $this->product->image_url), '/'))
+                    : null,
+                'current_stock' => $this->product->inventory?->quantity - $this->quantity,
             ],
         ];
     }

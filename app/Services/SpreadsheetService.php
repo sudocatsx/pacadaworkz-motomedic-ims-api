@@ -14,7 +14,7 @@ class SpreadsheetService
             throw new RuntimeException('Unable to create temporary spreadsheet file.');
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path, ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to open temporary spreadsheet archive.');
         }
@@ -30,7 +30,7 @@ class SpreadsheetService
         $index = 1;
         foreach ($sheets as $rows) {
             $zip->addFromString(
-                'xl/worksheets/sheet' . $index . '.xml',
+                'xl/worksheets/sheet'.$index.'.xml',
                 $this->worksheetXml($rows)
             );
             $index++;
@@ -43,7 +43,7 @@ class SpreadsheetService
 
     public function readXlsx(string $path): array
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
             throw new RuntimeException('Unable to open XLSX file.');
         }
@@ -63,13 +63,13 @@ class SpreadsheetService
             $relationshipId = (string) $attributes['id'];
             $target = $relationshipTargets[$relationshipId] ?? null;
 
-            if (!$target) {
+            if (! $target) {
                 continue;
             }
 
             $sheetPath = str_starts_with($target, 'worksheets/')
-                ? 'xl/' . $target
-                : 'xl/worksheets/' . basename($target);
+                ? 'xl/'.$target
+                : 'xl/worksheets/'.basename($target);
 
             $sheets[(string) $sheet['name']] = $this->readWorksheet($zip, $sheetPath, $sharedStrings);
         }
@@ -220,12 +220,12 @@ class SpreadsheetService
 
         foreach (array_values($rows) as $rowIndex => $row) {
             $rowNumber = $rowIndex + 1;
-            $xml .= '<row r="' . $rowNumber . '">';
+            $xml .= '<row r="'.$rowNumber.'">';
 
             foreach (array_values($row) as $columnIndex => $value) {
-                $cellRef = $this->columnName($columnIndex) . $rowNumber;
-                $xml .= '<c r="' . $cellRef . '" t="inlineStr"><is><t>' .
-                    htmlspecialchars((string) $value, ENT_XML1) .
+                $cellRef = $this->columnName($columnIndex).$rowNumber;
+                $xml .= '<c r="'.$cellRef.'" t="inlineStr"><is><t>'.
+                    htmlspecialchars((string) $value, ENT_XML1).
                     '</t></is></c>';
             }
 
@@ -244,7 +244,7 @@ class SpreadsheetService
 
         while ($index > 0) {
             $remainder = ($index - 1) % 26;
-            $name = chr(65 + $remainder) . $name;
+            $name = chr(65 + $remainder).$name;
             $index = intdiv($index - 1, 26);
         }
 
@@ -255,24 +255,24 @@ class SpreadsheetService
     {
         $overrides = '';
         for ($i = 1; $i <= $sheetCount; $i++) {
-            $overrides .= '<Override PartName="/xl/worksheets/sheet' . $i . '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+            $overrides .= '<Override PartName="/xl/worksheets/sheet'.$i.'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
         }
 
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' .
-            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' .
-            '<Default Extension="xml" ContentType="application/xml"/>' .
-            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' .
-            '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' .
-            $overrides .
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'.
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'.
+            '<Default Extension="xml" ContentType="application/xml"/>'.
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'.
+            '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'.
+            $overrides.
             '</Types>';
     }
 
     private function rootRelationshipsXml(): string
     {
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
-            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' .
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'.
             '</Relationships>';
     }
 
@@ -282,12 +282,12 @@ class SpreadsheetService
         foreach ($sheetNames as $index => $name) {
             $sheetId = $index + 1;
             $safeName = substr(str_replace(['[', ']', ':', '*', '?', '/', '\\'], ' ', $name), 0, 31);
-            $sheets .= '<sheet name="' . htmlspecialchars($safeName, ENT_XML1) . '" sheetId="' . $sheetId . '" r:id="rId' . $sheetId . '"/>';
+            $sheets .= '<sheet name="'.htmlspecialchars($safeName, ENT_XML1).'" sheetId="'.$sheetId.'" r:id="rId'.$sheetId.'"/>';
         }
 
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' .
-            '<sheets>' . $sheets . '</sheets>' .
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'.
+            '<sheets>'.$sheets.'</sheets>'.
             '</workbook>';
     }
 
@@ -295,24 +295,24 @@ class SpreadsheetService
     {
         $relationships = '';
         for ($i = 1; $i <= $sheetCount; $i++) {
-            $relationships .= '<Relationship Id="rId' . $i . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' . $i . '.xml"/>';
+            $relationships .= '<Relationship Id="rId'.$i.'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'.$i.'.xml"/>';
         }
 
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
-            $relationships .
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.
+            $relationships.
             '</Relationships>';
     }
 
     private function stylesXml(): string
     {
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
-            '<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>' .
-            '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>' .
-            '<borders count="1"><border/></borders>' .
-            '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' .
-            '<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>' .
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'.
+            '<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>'.
+            '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>'.
+            '<borders count="1"><border/></borders>'.
+            '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'.
+            '<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>'.
             '</styleSheet>';
     }
 }

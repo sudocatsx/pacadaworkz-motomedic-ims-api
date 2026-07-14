@@ -2,18 +2,15 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Services\DashboardService;
-use App\Http\Controllers\API\Controller;
+use App\Http\Resources\DashboardActivityLogResource;
 use App\Http\Resources\RevenueByBrandResource;
 use App\Http\Resources\RevenueByCategoryResource;
 use App\Http\Resources\SalesTrendResource;
 use App\Http\Resources\TopProductResource;
-use App\Http\Resources\DashboardActivityLogResource;
-use Illuminate\Http\Request;
+use App\Services\DashboardService;
 
 class DashboardController
 {
-
     protected $dashboardService;
 
     public function __construct(DashboardService $dashboardService)
@@ -21,7 +18,7 @@ class DashboardController
         $this->dashboardService = $dashboardService;
     }
 
-    //show statistics dashboard
+    // show statistics dashboard
     public function showStats()
     {
         try {
@@ -30,15 +27,14 @@ class DashboardController
 
             return response()->json([
                 'success' => true,
-                'data' => $result
+                'data' => $result,
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'An error occured'], 500);
         }
     }
 
-
-    //show sales trend
+    // show sales trend
     public function showSalesTrend()
     {
         try {
@@ -46,7 +42,7 @@ class DashboardController
 
             return response()->json([
                 'success' => true,
-                'data' => SalesTrendResource::format($result)
+                'data' => SalesTrendResource::format($result),
             ]);
         } catch (\Exception $e) {
             return response()->json(
@@ -56,8 +52,7 @@ class DashboardController
         }
     }
 
-
-    //show top products
+    // show top products
     public function showTopProducts()
     {
         try {
@@ -65,13 +60,12 @@ class DashboardController
 
             return response()->json([
                 'success' => true,
-                'data' => TopProductResource::format($result)
+                'data' => TopProductResource::format($result),
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-
 
     // show revenue per category
     public function showRevenueByCategory()
@@ -81,7 +75,7 @@ class DashboardController
 
             return response()->json([
                 'success' => true,
-                'data' => RevenueByCategoryResource::toKeyValue($result)
+                'data' => RevenueByCategoryResource::toKeyValue($result),
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -96,7 +90,7 @@ class DashboardController
 
             return response()->json([
                 'success' => true,
-                'data' => RevenueByBrandResource::toKeyValue($result)
+                'data' => RevenueByBrandResource::toKeyValue($result),
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -109,17 +103,14 @@ class DashboardController
         try {
             $result = $this->dashboardService->getInventoryOverview();
 
-
             return response()->json([
                 'success' => true,
-                'data' => $result
+                'data' => $result,
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-
-
 
     public function showRecentActivities()
     {
@@ -128,7 +119,7 @@ class DashboardController
 
             return response()->json([
                 'success' => true,
-                'data' => DashboardActivityLogResource::collection($result)
+                'data' => DashboardActivityLogResource::collection($result),
                 // 'data' => $result
             ]);
         } catch (\Exception $e) {

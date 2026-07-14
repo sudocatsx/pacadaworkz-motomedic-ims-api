@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\API\Controller;
-use App\Http\Requests\Settings\UpdateSystemSettingRequest;
 use App\Http\Requests\Settings\RestoreSystemSettingRequest;
+use App\Http\Requests\Settings\UpdateSystemSettingRequest;
 use App\Services\SystemSettingService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Exception;
 
 class SystemSettingController extends Controller
 {
@@ -23,8 +22,6 @@ class SystemSettingController extends Controller
 
     /**
      * Get global system configuration.
-     *
-     * @return JsonResponse
      */
     public function index(): JsonResponse
     {
@@ -36,22 +33,19 @@ class SystemSettingController extends Controller
                 'data' => $settings,
             ]);
         } catch (Exception $e) {
-            Log::error('System Settings [GET] Error: ' . $e->getMessage(), [
+            Log::error('System Settings [GET] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Update global system configuration.
-     *
-     * @param UpdateSystemSettingRequest $request
-     * @return JsonResponse
      */
     public function update(UpdateSystemSettingRequest $request): JsonResponse
     {
@@ -64,21 +58,19 @@ class SystemSettingController extends Controller
                 'data' => $updatedSettings,
             ]);
         } catch (Exception $e) {
-            Log::error('System Settings [PATCH] Error: ' . $e->getMessage(), [
+            Log::error('System Settings [PATCH] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Generate and download system backup.
-     *
-     * @return StreamedResponse|JsonResponse
      */
     public function backup(): StreamedResponse|JsonResponse
     {
@@ -87,22 +79,19 @@ class SystemSettingController extends Controller
 
             return Storage::download($path);
         } catch (Exception $e) {
-            Log::error('System Settings [BACKUP] Error: ' . $e->getMessage(), [
+            Log::error('System Settings [BACKUP] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Restore system from backup file.
-     *
-     * @param RestoreSystemSettingRequest $request
-     * @return JsonResponse
      */
     public function restore(RestoreSystemSettingRequest $request): JsonResponse
     {
@@ -111,7 +100,7 @@ class SystemSettingController extends Controller
 
         try {
             // Store file temporarily
-            $filename = 'restore_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
+            $filename = 'restore_'.time().'.'.$uploadedFile->getClientOriginalExtension();
             $tempPath = $uploadedFile->storeAs('temp_restores', $filename);
 
             $absolutePath = Storage::path($tempPath);
@@ -132,13 +121,13 @@ class SystemSettingController extends Controller
                 Storage::delete($tempPath);
             }
 
-            Log::error('System Settings [RESTORE] Error: ' . $e->getMessage(), [
+            Log::error('System Settings [RESTORE] Error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }

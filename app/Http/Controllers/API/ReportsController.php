@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers\API;
 
-use Exception;
+use App\Http\Requests\Reports\ReportDateRangeRequest;
 use App\Services\ReportsService;
 use App\Services\SpreadsheetService;
-use App\Http\Controllers\API\Controller;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+
 class ReportsController extends Controller
 {
     protected $reportsService;
+
     protected $spreadsheetService;
 
     public function __construct(ReportsService $reportsService, SpreadsheetService $spreadsheetService)
@@ -24,7 +26,7 @@ class ReportsController extends Controller
     {
         $period = $request->query('period');
 
-        if (!$period || $period === 'custom') {
+        if (! $period || $period === 'custom') {
             return [
                 $request->query('start_date', null),
                 $request->query('end_date', null),
@@ -60,114 +62,119 @@ class ReportsController extends Controller
             ],
         };
     }
- 
+
     // show all sales report
-     public function showSalesReport(Request $request){
-          try {
-           
-             [$start, $end] = $this->resolveDateRange($request);
-
-
-             $result = $this->reportsService->getSalesReport($start,$end);
-             return response()->json([
-                'success' => true,
-                'data' => $result
-             ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Report not found'], 404);
-        } catch (Exception $e) {
-            return response()->json(['message' => 'An error occured'], 500);
-        }
-     }
-
-//show all purchases
-     public function showPurchases(Request $request){
-        try {
-            [$start, $end] = $this->resolveDateRange($request);
-   
-             $result = $this->reportsService->getPurchases($start,$end);
-
-             return response()->json([
-                'success' => true,
-                'data' => $result
-             ]);
-            
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Report not found'], 404);
-        } catch (Exception $e) {
-              return response()->json(['message' => 'An error occured'], 500);
-        }
-
-     }
-
-// show inventory
-   public function showInventory(Request $request){
-     try {
-           [$start, $end] = $this->resolveDateRange($request);
-
-             $result = $this->reportsService->getInventory($start,$end);
-
-               return response()->json([
-                'success' => true,
-                'data' => $result
-             ]); 
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Report not found'], 404);
-        } catch (Exception $e) {
-            return response()->json(['message' => 'An error occured'], 500);
-        }
-   }
-
-//show performance
-   public function showPerformance(Request $request){
-                try {
-           [$start, $end] = $this->resolveDateRange($request);
-
-             $result = $this->reportsService->getPerformance($start,$end);
-
-               return response()->json([
-                'success' => true,
-                'data' => $result
-             ]); 
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Report not found'], 404);
-        } catch (Exception $e) {
-            return response()->json(['message' => 'An error occured'], 500);
-        }
-
-   }
-
-   
-   
-//show stock adjustments
-   public function showStockAdjustments(Request $request){
-                try {
-           [$start, $end] = $this->resolveDateRange($request);
-
-             $result = $this->reportsService->getStockAdjustments($start,$end);
-
-               return response()->json([
-                'success' => true,
-                'data' => $result
-             ]); 
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Report not found'], 404);
-        } catch (Exception $e) {
-            return response()->json(['message' => 'An error occured'], 500);
-        }
-
-   }
- // profit loss
-    public function showProfitLossReport(Request $request)
+    public function showSalesReport(ReportDateRangeRequest $request)
     {
         try {
-             [$start, $end] = $this->resolveDateRange($request);
-             
-             $result = $this->reportsService->getProfitLossReport($start,$end);
-             return response()->json([
+
+            [$start, $end] = $this->resolveDateRange($request);
+
+            $result = $this->reportsService->getSalesReport($start, $end);
+
+            return response()->json([
                 'success' => true,
-                'data' => $result
-             ]); 
+                'data' => $result,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Report not found'], 404);
+        } catch (Exception $e) {
+            return response()->json(['message' => 'An error occured'], 500);
+        }
+    }
+
+    // show all purchases
+    public function showPurchases(ReportDateRangeRequest $request)
+    {
+        try {
+            [$start, $end] = $this->resolveDateRange($request);
+
+            $result = $this->reportsService->getPurchases($start, $end);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Report not found'], 404);
+        } catch (Exception $e) {
+            return response()->json(['message' => 'An error occured'], 500);
+        }
+
+    }
+
+    // show inventory
+    public function showInventory(ReportDateRangeRequest $request)
+    {
+        try {
+            [$start, $end] = $this->resolveDateRange($request);
+
+            $result = $this->reportsService->getInventory($start, $end);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Report not found'], 404);
+        } catch (Exception $e) {
+            return response()->json(['message' => 'An error occured'], 500);
+        }
+    }
+
+    // show performance
+    public function showPerformance(ReportDateRangeRequest $request)
+    {
+        try {
+            [$start, $end] = $this->resolveDateRange($request);
+
+            $result = $this->reportsService->getPerformance($start, $end);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Report not found'], 404);
+        } catch (Exception $e) {
+            return response()->json(['message' => 'An error occured'], 500);
+        }
+
+    }
+
+    // show stock adjustments
+    public function showStockAdjustments(ReportDateRangeRequest $request)
+    {
+        try {
+            [$start, $end] = $this->resolveDateRange($request);
+
+            $result = $this->reportsService->getStockAdjustments($start, $end);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Report not found'], 404);
+        } catch (Exception $e) {
+            return response()->json(['message' => 'An error occured'], 500);
+        }
+
+    }
+
+    // profit loss
+    public function showProfitLossReport(ReportDateRangeRequest $request)
+    {
+        try {
+            [$start, $end] = $this->resolveDateRange($request);
+
+            $result = $this->reportsService->getProfitLossReport($start, $end);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Report not found'], 404);
         } catch (Exception $e) {
@@ -175,35 +182,35 @@ class ReportsController extends Controller
         }
     }
 
+    public function export($type, ReportDateRangeRequest $request)
+    {
+        try {
+            [$start, $end] = $this->resolveDateRange($request);
+            $format = strtolower($request->query('format', 'xlsx'));
 
-      public function export($type,Request $request){
-         try {
-             [$start, $end] = $this->resolveDateRange($request);
-             $format = strtolower($request->query('format', 'xlsx'));
+            if ($format === 'csv') {
+                $result = $this->reportsService->getReportCSV($start, $end, $type);
 
-             if ($format === 'csv') {
-                 $result = $this->reportsService->getReportCSV($start,$end,$type);
-                 return response($result, 200, [
-                     'Content-Type' => 'text/csv',
-                     'Content-Disposition' => 'attachment; filename="' . $type . '-report.csv"',
-                 ]);
-             }
+                return response($result, 200, [
+                    'Content-Type' => 'text/csv',
+                    'Content-Disposition' => 'attachment; filename="'.$type.'-report.csv"',
+                ]);
+            }
 
-             $rows = $this->reportsService->getReportRows($start,$end,$type);
-             $path = $this->spreadsheetService->createXlsx([
-                 'Report' => $rows,
-             ]);
+            $rows = $this->reportsService->getReportRows($start, $end, $type);
+            $path = $this->spreadsheetService->createXlsx([
+                'Report' => $rows,
+            ]);
 
-             return response()
-                 ->download($path, $type . '-report.xlsx', [
-                     'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                 ])
-                 ->deleteFileAfterSend(true);
+            return response()
+                ->download($path, $type.'-report.xlsx', [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ])
+                ->deleteFileAfterSend(true);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Report not found'], 404);
         } catch (Exception $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
-      }
-
     }
+}

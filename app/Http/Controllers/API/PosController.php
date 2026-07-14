@@ -2,29 +2,38 @@
 
 namespace App\Http\Controllers\API;
 
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Request;
-use App\Http\Controllers\API\Controller;
-use App\Exceptions\POS\Cart\CartItemNotFoundException;
 use App\Exceptions\Inventory\InsufficientStockException;
+use App\Exceptions\POS\Cart\CartItemNotFoundException;
 use App\Exceptions\POS\Cart\EmptyCartException;
 use App\Exceptions\POS\InsufficientPaymentException;
 use App\Http\Requests\POS\Cart\ApplyDiscountRequest;
-use App\Http\Requests\POS\CheckoutRequest;
 use App\Http\Requests\POS\Cart\StoreCartItemRequest;
 use App\Http\Requests\POS\Cart\UpdateCartItemRequest;
-use App\Services\PosService;
-use App\Http\Resources\CartResource;
+use App\Http\Requests\POS\CheckoutRequest;
 use App\Http\Resources\CartItemResource;
+use App\Http\Resources\CartResource;
+use App\Http\Resources\PosProductResource;
 use App\Http\Resources\SalesTransactionResource;
+use App\Services\AuthorizationPinService;
+use App\Services\PosService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class PosController extends Controller
 {
     private $posService;
 
-    public function __construct(PosService $posService)
+    public function __construct(PosService $posService, private AuthorizationPinService $pins)
     {
         $this->posService = $posService;
+    }
+
+    public function products()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => PosProductResource::collection($this->posService->getProducts()),
+        ]);
     }
 
     public function show()
@@ -40,12 +49,12 @@ class PosController extends Controller
                     'cart' => CartResource::make($result['cart']),
                     'summary' => $result['summary'],
                 ],
-                'message' => 'Cart retrieved successfully'
+                'message' => 'Cart retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => "Internal server error" //least information bai kapag production na
+                'message' => 'Internal server error', // least information bai kapag production na
                 // 'message' => $e->getMessage() //comment out kapag dev mode
             ], 500);
         }
@@ -66,7 +75,7 @@ class PosController extends Controller
                 // 'data' => new CartItemResource($result),
                 'data' => CartItemResource::make($result),
                 // 'data' => $result,
-                'message' => 'Item added to cart successfully'
+                'message' => 'Item added to cart successfully',
             ], 201);
         } catch (InsufficientStockException $e) {
             return response()->json([
@@ -74,7 +83,7 @@ class PosController extends Controller
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('POS Add to Cart Error: ' . $e->getMessage(), [
+            \Log::error('POS Add to Cart Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString(),
@@ -100,7 +109,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => CartItemResource::make($result),
-                'message' => 'Cart item updated successfully'
+                'message' => 'Cart item updated successfully',
             ]);
         } catch (InsufficientStockException $e) {
             return response()->json([
@@ -113,7 +122,7 @@ class PosController extends Controller
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('POS Update Cart Item Error: ' . $e->getMessage(), [
+            \Log::error('POS Update Cart Item Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString(),
@@ -135,15 +144,15 @@ class PosController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Cart item removed successfully'
+                'message' => 'Cart item removed successfully',
             ]);
         } catch (CartItemNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('POS Delete Cart Item Error: ' . $e->getMessage(), [
+            \Log::error('POS Delete Cart Item Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'cart_item_id' => $id,
                 'trace' => $e->getTraceAsString(),
@@ -165,10 +174,10 @@ class PosController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Cart cleared successfully'
+                'message' => 'Cart cleared successfully',
             ]);
         } catch (\Exception $e) {
-            \Log::error('POS Clear Cart Error: ' . $e->getMessage(), [
+            \Log::error('POS Clear Cart Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -186,9 +195,12 @@ class PosController extends Controller
         try {
             $validated = $request->validated();
             $userId = Auth::id();
+            $initiator = $request->user('api')->load('role.permissions');
+            $authorizer = $this->pins->authorize($initiator, (int) $validated['authorizer_id'], $validated['pin'], 'POS', 'Authorize Discount');
+            unset($validated['authorizer_id'], $validated['pin']);
 
             $cart = $this->posService->applyDiscount($userId, $validated);
-            $result = $this->posService->getCart($userId); //recalculate summary after discount
+            $result = $this->posService->getCart($userId); // recalculate summary after discount
 
             return response()->json([
                 'success' => true,
@@ -196,25 +208,31 @@ class PosController extends Controller
                     'cart' => CartResource::make($result['cart']),
                     'summary' => $result['summary'],
                 ],
-                'message' => 'Discount applied successfully'
+                'message' => 'Discount applied successfully',
             ]);
         } catch (EmptyCartException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], $e->getCode());
+        } catch (ValidationException $e) {
+            $errors = $e->errors();
+
+            return response()->json([
+                'success' => false,
+                'message' => $errors['pin'][0] ?? 'Authorization failed. Please check the selected authorizer and PIN.',
+                'errors' => $errors,
+            ], 422);
         } catch (\Exception $e) {
-            \Log::error('POS Apply Discount Error: ' . $e->getMessage(), [
+            \Log::error('POS Apply Discount Error: '.$e->getMessage(), [
                 'user_id' => $userId,
-                'request' => $request->all(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
-                // 'message' => $e->getMessage(),
-            ], $e->getCode());
+                'message' => 'We could not apply the discount. Please try again.',
+            ], 500);
         }
     }
 
@@ -229,7 +247,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => SalesTransactionResource::make($transaction),
-                'message' => 'Checkout successful'
+                'message' => 'Checkout successful',
             ]);
         } catch (InsufficientStockException $e) {
             return response()->json([
@@ -248,7 +266,7 @@ class PosController extends Controller
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('POS Checkout Error: ' . $e->getMessage(), [
+            \Log::error('POS Checkout Error: '.$e->getMessage(), [
                 'user_id' => $userId,
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString(),
@@ -257,7 +275,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => false,
                 // 'message' => $e->getMessage(),
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }

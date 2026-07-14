@@ -6,9 +6,7 @@ use App\Models\Attribute;
 use App\Models\AttributesValue;
 use App\Models\Brand;
 use App\Models\Category;
-use App\Models\Product;
 use App\Models\Supplier;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -40,14 +38,16 @@ class CatalogImportService
             'location',
             'reorder_level',
             'attribute_values',
+            'is_active',
+            'image_source_url',
         ],
     ];
 
     public function __construct(
         private readonly SpreadsheetService $spreadsheetService,
-        private readonly ActivityLogService $activityLogService
-    ) {
-    }
+        private readonly ActivityLogService $activityLogService,
+        private readonly ProductService $productService
+    ) {}
 
     public function templateSheets(?string $type = null): array
     {
@@ -57,7 +57,7 @@ class CatalogImportService
             ])
             ->all();
 
-        if (!$type) {
+        if (! $type) {
             return $sheets;
         }
 
@@ -71,7 +71,7 @@ class CatalogImportService
         $summary = $this->emptySummary();
 
         if ($extension === 'csv') {
-            if (!$type || !array_key_exists($type, $summary)) {
+            if (! $type || ! array_key_exists($type, $summary)) {
                 throw ValidationException::withMessages([
                     'file' => ['CSV imports require a valid type.'],
                 ]);
@@ -87,7 +87,7 @@ class CatalogImportService
                 $sheetName = $this->sheetNameForType($type);
                 $rows = $sheets[$sheetName] ?? (count($sheets) === 1 ? reset($sheets) : null);
 
-                if (!$rows) {
+                if (! $rows) {
                     throw ValidationException::withMessages([
                         'file' => ["The uploaded XLSX file does not contain a sheet for {$type} imports."],
                     ]);
@@ -101,7 +101,7 @@ class CatalogImportService
 
             $importableSheets = [];
             foreach (self::SHEET_TYPES as $sheetName => $sheetType) {
-                if (!isset($sheets[$sheetName])) {
+                if (! isset($sheets[$sheetName])) {
                     continue;
                 }
 
@@ -206,7 +206,7 @@ class CatalogImportService
         $name = $this->value($record, 'name');
         $attribute = Attribute::where('name', $name)->first();
 
-        if (!$attribute) {
+        if (! $attribute) {
             $validator = Validator::make($record, [
                 'name' => [
                     'required',
@@ -233,6 +233,7 @@ class CatalogImportService
         foreach ($this->splitList($this->value($record, 'values')) as $value) {
             if (AttributesValue::where('value', $value)->exists()) {
                 $this->skipped('attributes', $rowNumber, $value, 'Attribute value already exists.', $summary);
+
                 continue;
             }
 
@@ -301,6 +302,8 @@ class CatalogImportService
             'reorder_level' => $this->value($record, 'reorder_level') ?: 10,
             'initial_stock' => $this->value($record, 'initial_stock') ?: 0,
             'location' => $this->value($record, 'location'),
+            'is_active' => $this->booleanValue($this->value($record, 'is_active'), true),
+            'image_source_url' => $this->value($record, 'image_source_url'),
         ];
 
         $validator = Validator::make($data, [
@@ -317,7 +320,9 @@ class CatalogImportService
             'cost_price' => 'required|numeric|min:0',
             'reorder_level' => 'sometimes|integer|min:0',
             'initial_stock' => 'sometimes|integer|min:0',
-            'location' => 'sometimes|nullable|string',
+            'location' => 'sometimes|nullable|string|max:255',
+            'is_active' => 'required|boolean',
+            'image_source_url' => 'sometimes|nullable|url:https|max:2048',
         ]);
 
         if ($this->handleInvalid($validator, 'products', $rowNumber, $summary)) {
@@ -327,31 +332,11 @@ class CatalogImportService
         $attributeValueIds = $this->resolveAttributeValues($this->value($record, 'attribute_values'));
         if ($attributeValueIds === null) {
             $this->failed('products', $rowNumber, $record['sku'] ?? '', 'One or more attribute values were not found.', $summary);
+
             return;
         }
 
-        DB::transaction(function () use ($data, $attributeValueIds) {
-            $product = Product::create([
-                'category_id' => $data['category_id'],
-                'brand_id' => $data['brand_id'],
-                'sku' => $data['sku'],
-                'name' => $data['name'],
-                'description' => $data['description'],
-                'unit_price' => $data['unit_price'],
-                'cost_price' => $data['cost_price'],
-                'reorder_level' => $data['reorder_level'],
-            ]);
-
-            $product->inventory()->create([
-                'quantity' => $data['initial_stock'],
-                'location' => $data['location'],
-                'last_stock_in' => (int) $data['initial_stock'] > 0 ? now() : null,
-            ]);
-
-            foreach ($attributeValueIds as $attributeValueId) {
-                $product->attribute_values()->syncWithoutDetaching([$attributeValueId]);
-            }
-        });
+        $this->productService->create([...$data, 'attribute_value_ids' => $attributeValueIds]);
 
         $this->created('products', $rowNumber, $record['sku'], $summary);
     }
@@ -361,7 +346,7 @@ class CatalogImportService
         $ids = [];
 
         foreach ($this->splitList($attributeValues) as $pair) {
-            if (!str_contains($pair, ':')) {
+            if (! str_contains($pair, ':')) {
                 return null;
             }
 
@@ -371,7 +356,7 @@ class CatalogImportService
                 ->whereHas('attribute', fn ($query) => $query->where('name', $attributeName))
                 ->first();
 
-            if (!$attributeValue) {
+            if (! $attributeValue) {
                 return null;
             }
 
@@ -418,11 +403,11 @@ class CatalogImportService
         $parts = ["The uploaded file headers do not match the {$type} import template."];
 
         if ($missing !== []) {
-            $parts[] = 'Missing columns: ' . implode(', ', $missing) . '.';
+            $parts[] = 'Missing columns: '.implode(', ', $missing).'.';
         }
 
         if ($unexpected !== []) {
-            $parts[] = 'Unexpected columns: ' . implode(', ', $unexpected) . '.';
+            $parts[] = 'Unexpected columns: '.implode(', ', $unexpected).'.';
         }
 
         throw ValidationException::withMessages([
@@ -463,7 +448,7 @@ class CatalogImportService
 
     private function handleInvalid($validator, string $type, int $rowNumber, array &$summary): bool
     {
-        if (!$validator->fails()) {
+        if (! $validator->fails()) {
             return false;
         }
 
@@ -495,7 +480,7 @@ class CatalogImportService
         $summary[$type]['rows'][] = [
             'row' => $rowNumber,
             'status' => 'skipped',
-            'message' => trim($label . ' ' . $message),
+            'message' => trim($label.' '.$message),
         ];
     }
 
@@ -505,13 +490,13 @@ class CatalogImportService
         $summary[$type]['rows'][] = [
             'row' => $rowNumber,
             'status' => 'failed',
-            'message' => trim($label . ' ' . $message),
+            'message' => trim($label.' '.$message),
         ];
     }
 
     private function splitList(?string $value): array
     {
-        if (!$value) {
+        if (! $value) {
             return [];
         }
 
@@ -543,5 +528,14 @@ class CatalogImportService
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    private function booleanValue(?string $value, bool $default): bool
+    {
+        if ($value === null || trim($value) === '') {
+            return $default;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 }

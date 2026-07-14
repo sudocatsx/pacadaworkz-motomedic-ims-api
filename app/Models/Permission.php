@@ -9,20 +9,18 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Permission extends Model
 {
     use SoftDeletes;
-    
+
     //
 
-     // fillable is for mass assigment (allowed na ifill up)
-      protected $fillable = [
+    // fillable is for mass assigment (allowed na ifill up)
+    protected $fillable = [
         'name',
         'description',
-        'module'
+        'module',
     ];
 
     /**
      * The roles that belong to the Permission
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
      */
     public function roles(): BelongsToMany
     {

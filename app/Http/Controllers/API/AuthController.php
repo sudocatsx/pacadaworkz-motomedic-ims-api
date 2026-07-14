@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers\API;
 
-use Illuminate\Http\Request;
-use App\Services\AuthService;
-use App\Http\Controllers\API\Controller;
-use App\Http\Resources\AuthUserResource;
 use App\Exceptions\Auth\InvalidCredentialsException;
+use App\Http\Resources\AuthUserResource;
+use App\Services\AuthService;
+use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
@@ -24,23 +23,23 @@ class AuthController extends Controller
             $tokens = $this->authService->login($credentials);
 
             return response()->json([
-                "success" => true,
-                "data" => [
-                    "access_token" => $tokens["access_token"],
-                    "expires_in" => auth('api')->factory()->getTTL() * 60,
-                    "token_type" => "bearer",
-                    "refresh_token" => $tokens["refresh_token"]
-                ]
+                'success' => true,
+                'data' => [
+                    'access_token' => $tokens['access_token'],
+                    'expires_in' => auth('api')->factory()->getTTL() * 60,
+                    'token_type' => 'bearer',
+                    'refresh_token' => $tokens['refresh_token'],
+                ],
             ]);
         } catch (InvalidCredentialsException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -49,6 +48,7 @@ class AuthController extends Controller
     {
         try {
             $refresh = $this->authService->refresh();
+
             return response()->json([
                 'success' => true,
                 'data' => $refresh,
@@ -56,7 +56,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 401);
         }
     }
@@ -65,16 +65,17 @@ class AuthController extends Controller
     {
         try {
             $this->authService->logout();
+
             return response()->json([
-                "success" => true,
-                "data" => [
-                    "message" => "Successfully logged out"
-                ]
+                'success' => true,
+                'data' => [
+                    'message' => 'Successfully logged out',
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -83,14 +84,15 @@ class AuthController extends Controller
     {
         try {
             $me = $this->authService->me();
+
             return response()->json([
-                "success" => true,
-                "data" => AuthUserResource::make($me)
+                'success' => true,
+                'data' => AuthUserResource::make($me),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 401);
         }
     }

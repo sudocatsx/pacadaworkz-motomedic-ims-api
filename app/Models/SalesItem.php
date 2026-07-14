@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SalesItem extends Model
 {
@@ -17,9 +17,13 @@ class SalesItem extends Model
         'quantity',
         'quantity_returned',
         'unit_price',
+        'unit_cost',
+        'allocated_discount',
+        'net_line_total',
+        'refunded_line_amount',
     ];
 
-    //Entity Relationship to the sales_transaction
+    // Entity Relationship to the sales_transaction
     public function sales_transaction(): BelongsTo
     {
         return $this->belongsTo(SalesTransaction::class, 'sales_transactions_id');

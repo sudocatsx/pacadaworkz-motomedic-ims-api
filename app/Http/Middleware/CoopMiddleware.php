@@ -17,6 +17,7 @@ class CoopMiddleware
     {
         $response = $next($request);
         $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
         return $response;
     }
 }

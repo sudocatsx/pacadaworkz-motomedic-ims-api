@@ -6,7 +6,6 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Role;
-use App\Models\Supplier;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -142,7 +141,7 @@ test('product creation stores attribute values and exposes relationship ids', fu
             'attribute_value_ids' => [$value->id],
         ]);
 
-    $response->assertOk()
+    $response->assertCreated()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.category_id', $category->id)
         ->assertJsonPath('data.brand_id', $brand->id)
@@ -201,7 +200,7 @@ test('catalog csv import creates new categories and skips duplicates', function 
 test('catalog csv import rejects product headers for supplier imports', function () {
     $file = UploadedFile::fake()->createWithContent(
         'products.csv',
-        "sku,name,category_name,brand_name,unit_price,cost_price,description,initial_stock,location,reorder_level,attribute_values\n" .
+        "sku,name,category_name,brand_name,unit_price,cost_price,description,initial_stock,location,reorder_level,attribute_values\n".
         "ENG-001,Engine Oil,Fluids,Motul,500,300,Fully synthetic,10,Shelf A,3,\n"
     );
 
@@ -220,7 +219,7 @@ test('catalog csv import rejects product headers for supplier imports', function
 test('catalog csv import creates suppliers with valid supplier headers', function () {
     $file = UploadedFile::fake()->createWithContent(
         'suppliers.csv',
-        "name,contact_person,email,phone,address\n" .
+        "name,contact_person,email,phone,address\n".
         "Motul Philippines,Juan Dela Cruz,motul@example.test,09171234567,Manila\n"
     );
 

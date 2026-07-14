@@ -20,16 +20,16 @@ class StockMovementRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
-public function rules(): array
-{
-    return [
-        'product_id' => ['required', 'integer', 'exists:products,id'],
-        'user_id' => ['required', 'integer', 'exists:users,id'],
-        'movement_type' => ['required', 'string', Rule::in(['in', 'out'])],
-        'quantity' => ['required', 'integer', 'min:1'],
-        'reference_type' => ['nullable', 'string'],
-        'reference_id' => ['nullable', 'integer'],
-        'notes' => ['nullable', 'string', 'max:500'],
-    ];
-}
+    public function rules(): array
+    {
+        return [
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'movement_type' => ['required', 'string', Rule::in(['in', 'out'])],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'reference_type' => ['nullable', 'string'],
+            'reference_id' => ['nullable', 'integer'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ];
+    }
 }

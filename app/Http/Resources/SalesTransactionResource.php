@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\SalesItemResource;
 
 class SalesTransactionResource extends JsonResource
 {
@@ -19,6 +18,10 @@ class SalesTransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
+            'cashier' => $this->whenLoaded('user', fn () => [
+                'id' => $this->user?->id,
+                'name' => $this->user?->name,
+            ]),
             'transaction_no' => $this->transaction_no,
             'subtotal' => (float) $this->subtotal,
             'tax' => (float) $this->tax,
@@ -29,8 +32,15 @@ class SalesTransactionResource extends JsonResource
             'amount_tendered' => (float) $this->amount_tendered,
             'change' => (float) $this->change,
             'status' => $this->status,
+            'refund_amount' => (float) ($this->refund_amount ?? 0),
+            'refund_reason' => $this->refund_reason,
+            'refunded_at' => $this->refunded_at,
+            'net_sales' => $this->status === 'voided'
+                ? 0.0
+                : max(0, (float) $this->total_amount - (float) ($this->refund_amount ?? 0)),
             'created_at' => $this->created_at,
-            'sales_item' => SalesItemResource::collection($this->whenLoaded('sales_items'))
+            'sales_item' => SalesItemResource::collection($this->whenLoaded('sales_items')),
+            'authorization_history' => TransactionAuthorizationResource::collection($this->whenLoaded('authorizations')),
         ];
     }
 }

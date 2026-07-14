@@ -28,20 +28,29 @@ function reportsUserForRole(string $roleName = 'admin'): User
     ]);
 }
 
-function createSalesTransactionForDate(User $user, string $date, float $total): void
+function createSalesTransactionForDate(
+    User $user,
+    string $date,
+    float $subtotal,
+    float $discount = 0,
+    float $refund = 0,
+    string $status = 'completed',
+): void
 {
+    $total = $subtotal - $discount;
     DB::table('sales_transactions')->insert([
         'user_id' => $user->id,
-        'transaction_no' => 'TXN-' . str_replace(['-', ' ', ':'], '', $date),
-        'subtotal' => $total,
+        'transaction_no' => 'TXN-'.str_replace(['-', ' ', ':'], '', $date),
+        'subtotal' => $subtotal,
         'tax' => 0,
-        'discount' => 0,
+        'discount' => $discount,
         'discount_type' => null,
         'total_amount' => $total,
+        'refund_amount' => $refund,
         'payment_method' => 'cash',
         'amount_tendered' => $total,
         'change' => 0,
-        'status' => 'completed',
+        'status' => $status,
         'created_at' => Carbon::parse($date),
         'updated_at' => Carbon::parse($date),
     ]);
@@ -72,19 +81,19 @@ function createInventoryReportProduct(
 ): int {
     $now = Carbon::now();
     $categoryId = DB::table('categories')->insertGetId([
-        'name' => $name . ' Category',
+        'name' => $name.' Category',
         'description' => null,
         'created_at' => $now,
         'updated_at' => $now,
     ]);
     $brandId = DB::table('brands')->insertGetId([
-        'name' => $name . ' Brand',
+        'name' => $name.' Brand',
         'description' => null,
         'created_at' => $now,
         'updated_at' => $now,
     ]);
     $supplierId = DB::table('suppliers')->insertGetId([
-        'name' => $name . ' Supplier',
+        'name' => $name.' Supplier',
         'created_at' => $now,
         'updated_at' => $now,
     ]);
@@ -105,7 +114,6 @@ function createInventoryReportProduct(
 
     DB::table('inventory')->insert([
         'product_id' => $productId,
-        'supplier_id' => $supplierId,
         'quantity' => $quantity,
         'last_stock_in' => $quantity > 0 ? $now : null,
         'created_at' => $now,
@@ -128,7 +136,7 @@ function createReportSalesItem(
     $netAmount = max($quantity - $quantityReturned, 0) * $unitPrice;
     $transactionId = DB::table('sales_transactions')->insertGetId([
         'user_id' => $user->id,
-        'transaction_no' => 'RPT-' . $status . '-' . $productId . '-' . uniqid(),
+        'transaction_no' => 'RPT-'.$status.'-'.$productId.'-'.uniqid(),
         'subtotal' => $netAmount,
         'tax' => 0,
         'discount' => 0,
@@ -209,6 +217,42 @@ test('weekly report period uses sunday through saturday instead of rolling seven
     ]);
 });
 
+test('sales report reconciles gross sales discounts refunds and net sales while excluding voids', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
+    $user = reportsUserForRole();
+    $user->update(['name' => 'Reconciliation Cashier']);
+
+    createSalesTransactionForDate($user, '2026-07-08 08:00:00', 200);
+    createSalesTransactionForDate($user, '2026-07-08 09:00:00', 200, 20);
+    createSalesTransactionForDate($user, '2026-07-08 10:00:00', 200, 0, 100, 'partially_refunded');
+    createSalesTransactionForDate($user, '2026-07-08 11:00:00', 200, 0, 0, 'voided');
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?period=daily');
+
+    $response->assertOk()
+        ->assertJsonPath('data.gross_sales', 600)
+        ->assertJsonPath('data.discounts', 20)
+        ->assertJsonPath('data.refunds', 100)
+        ->assertJsonPath('data.net_sales', 480)
+        ->assertJsonPath('data.total_sales', 480)
+        ->assertJsonPath('data.transactions', 4)
+        ->assertJsonPath('data.average_transaction', 160)
+        ->assertJsonPath('data.trend.0.total', 480)
+        ->assertJsonPath('data.sales_by_staff.Reconciliation Cashier', 480);
+
+    $csv = $this->actingAs($user, 'api')
+        ->get('/api/v1/reports/sales/export?format=csv&period=daily')
+        ->assertOk()
+        ->getContent();
+
+    expect($csv)
+        ->toContain('"Gross Sales",600')
+        ->toContain('Discounts,20')
+        ->toContain('Refunds,100')
+        ->toContain('"Net Sales",480');
+});
+
 test('custom report period uses explicit start and end dates', function () {
     Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
 
@@ -230,6 +274,72 @@ test('custom report period uses explicit start and end dates', function () {
         ->assertJsonPath('data.trend.1.total', 0)
         ->assertJsonPath('data.trend.4.date', '2026-07-05')
         ->assertJsonPath('data.trend.4.total', 200);
+});
+
+test('custom report period requires a complete valid historical date range', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-13 12:00:00'));
+    $user = reportsUserForRole();
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?period=custom')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date', 'end_date']);
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=2026-07-10')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=2026-07-10&end_date=2026-07-01')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+
+    $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=2026-07-10&end_date=2026-07-14')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+});
+
+test('long sales report ranges use bounded zero-filled monthly trends', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-13 12:00:00'));
+    $user = reportsUserForRole();
+
+    createSalesTransactionForDate($user, '1975-01-15 10:00:00', 100);
+    createSalesTransactionForDate($user, '2026-07-01 10:00:00', 200);
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?start_date=1975-01-01&end_date=2026-07-13')
+        ->assertOk()
+        ->assertJsonPath('data.total_sales', 300)
+        ->assertJsonPath('data.trend_granularity', 'monthly')
+        ->assertJsonPath('data.trend.0.date', '1975-01')
+        ->assertJsonPath('data.trend.0.total', 100)
+        ->assertJsonPath('data.trend.618.date', '2026-07')
+        ->assertJsonPath('data.trend.618.total', 200);
+
+    expect($response->json('data.trend'))->toHaveCount(619);
+});
+
+test('long purchase report ranges use the same monthly trend strategy', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-13 12:00:00'));
+    $user = reportsUserForRole();
+    $supplier = Supplier::create(['name' => 'Monthly Trend Supplier']);
+
+    createPurchaseOrderForDate($user, $supplier, '2024-01-15 10:00:00', 500);
+    createPurchaseOrderForDate($user, $supplier, '2026-07-01 10:00:00', 700);
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/purchases?start_date=2024-01-01&end_date=2026-07-13')
+        ->assertOk()
+        ->assertJsonPath('data.total_purchases', 1200)
+        ->assertJsonPath('data.trend_granularity', 'monthly')
+        ->assertJsonPath('data.trend.0.date', '2024-01')
+        ->assertJsonPath('data.trend.0.total', 500)
+        ->assertJsonPath('data.trend.30.date', '2026-07')
+        ->assertJsonPath('data.trend.30.total', 700);
+
+    expect($response->json('data.trend'))->toHaveCount(31);
 });
 
 test('purchase report groups totals by supplier from backend data', function () {

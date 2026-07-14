@@ -22,6 +22,10 @@ class RoleSeeder extends Seeder
                 'description' => 'Administrator with access',
             ],
             [
+                'role_name' => 'manager',
+                'description' => 'Manager with retail operations and lower-scope user management',
+            ],
+            [
                 'role_name' => 'staff',
                 'description' => 'Staff with limited permissions',
             ],

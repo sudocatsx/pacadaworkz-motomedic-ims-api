@@ -2,29 +2,26 @@
 
 namespace App\Services;
 
-use App\Models\SalesItem;
-use App\Models\SalesTransaction;
+use App\Models\Product;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseOrder;
-use App\Models\Product;
+use App\Models\SalesTransaction;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
-use App\Services\ReportCSVService;
 
 class ReportsService
 {
-
     protected $reportCSVService;
 
-    public function __construct(ReportCSVService $reportCSVService)
+    public function __construct(ReportCSVService $reportCSVService, private readonly FinancialAggregationService $financials)
     {
         $this->reportCSVService = $reportCSVService;
     }
 
     private function normalizeDateRange($start = null, $end = null, ?string $fallbackTable = null): array
     {
-        if (!$start && $fallbackTable) {
+        if (! $start && $fallbackTable) {
             $start = DB::table($fallbackTable)->min('created_at');
         }
 
@@ -39,21 +36,29 @@ class ReportsService
         return [$start, $end];
     }
 
-    private function dailyTrendSeries(Carbon $start, Carbon $end, $totals)
+    private function trendSeries(Carbon $start, Carbon $end, $totals): array
     {
-        $totalsByDate = collect($totals)->keyBy('date');
+        $isDaily = $start->diffInDays($end) + 1 <= 366;
+        $format = $isDaily ? 'Y-m-d' : 'Y-m';
+        $interval = $isDaily ? '1 day' : '1 month';
+        $periodStart = $isDaily ? $start->copy()->startOfDay() : $start->copy()->startOfMonth();
+        $periodEnd = $isDaily ? $end->copy()->startOfDay() : $end->copy()->startOfMonth();
+        $totalsByPeriod = collect($totals)
+            ->groupBy(fn ($row) => Carbon::parse($row->date)->format($format))
+            ->map(fn ($rows) => (float) $rows->sum('total'));
 
-        return collect(CarbonPeriod::create($start->copy()->startOfDay(), $end->copy()->startOfDay()))
-            ->map(function (Carbon $date) use ($totalsByDate) {
-                $dateKey = $date->toDateString();
-                $total = $totalsByDate->get($dateKey)->total ?? 0;
+        $trend = collect(CarbonPeriod::create($periodStart, $interval, $periodEnd))
+            ->map(function (Carbon $date) use ($format, $totalsByPeriod) {
+                $dateKey = $date->format($format);
 
                 return (object) [
                     'date' => $dateKey,
-                    'total' => (float) $total,
+                    'total' => (float) ($totalsByPeriod->get($dateKey) ?? 0),
                 ];
             })
             ->values();
+
+        return [$trend, $isDaily ? 'daily' : 'monthly'];
     }
 
     // sales report
@@ -62,22 +67,21 @@ class ReportsService
 
         [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_transactions');
 
-
         $query = SalesTransaction::query();
-        $trendTotals = SalesTransaction::selectRaw('DATE(created_at) as date, SUM(total_amount) as total')
+        $trendTotals = SalesTransaction::selectRaw('DATE(created_at) as date, SUM('.FinancialAggregationService::NET_SALES.') as total')
             ->when($start && $end, function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
             })
             ->groupBy('date')
             ->orderBy('date')
             ->get();
-        $trend = $this->dailyTrendSeries($start, $end, $trendTotals);
+        [$trend, $trendGranularity] = $this->trendSeries($start, $end, $trendTotals);
 
         $staffNameExpression = "COALESCE(NULLIF(users.name, ''), NULLIF(TRIM(users.first_name || ' ' || users.last_name), ''), 'Unknown Staff')";
         $salesByStaff = DB::table('sales_transactions')
             ->leftJoin('users', 'sales_transactions.user_id', '=', 'users.id')
             ->whereBetween('sales_transactions.created_at', [$start, $end])
-            ->selectRaw("{$staffNameExpression} as staff_name, SUM(sales_transactions.total_amount) as total")
+            ->selectRaw("{$staffNameExpression} as staff_name, SUM(CASE WHEN sales_transactions.status = 'voided' THEN 0 ELSE sales_transactions.total_amount - COALESCE(sales_transactions.refund_amount, 0) END) as total")
             ->groupByRaw($staffNameExpression)
             ->orderByDesc('total')
             ->get()
@@ -89,16 +93,19 @@ class ReportsService
             $query->whereBetween('created_at', [$start, $end]);
         }
 
+        $revenueTransactions = (clone $query)->where('status', '!=', 'voided')->count();
+        $salesBridge = $this->financials->salesBridge($start, $end);
 
         return [
-            'total_sales' => $query->sum('total_amount'),
+            ...$salesBridge,
+            'total_sales' => $salesBridge['net_sales'],
             'transactions' => $query->count(),
-            'average_transaction' => round($query->avg('total_amount'), 2),
+            'average_transaction' => round($revenueTransactions > 0 ? $salesBridge['net_sales'] / $revenueTransactions : 0, 2),
             'trend' => $trend,
+            'trend_granularity' => $trendGranularity,
             'sales_by_staff' => $salesByStaff,
         ];
     }
-
 
     // purchase report
     public function getPurchases($start = null, $end = null)
@@ -117,7 +124,7 @@ class ReportsService
             ->groupBy('date')
             ->orderBy('date')
             ->get();
-        $trend = $this->dailyTrendSeries($start, $end, $trendTotals);
+        [$trend, $trendGranularity] = $this->trendSeries($start, $end, $trendTotals);
 
         $purchaseBySupplier = DB::table('purchase_orders')
             ->leftJoin('suppliers', 'purchase_orders.supplier_id', '=', 'suppliers.id')
@@ -135,18 +142,19 @@ class ReportsService
             'purchase_orders' => $ordersQuery->count(),
             'average_orders' => $averageOrder,
             'trend' => $trend,
+            'trend_granularity' => $trendGranularity,
             'purchase_by_supplier' => $purchaseBySupplier,
         ];
     }
 
-    //inventory report
+    // inventory report
     public function getInventory($start = null, $end = null)
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_movements');
 
         // query of product
         $productsQuery = Product::query();
-        //inventory
+        // inventory
         $inventory = DB::table('inventory');
         // inventory value
         $totalInventoryValue = $inventory
@@ -183,7 +191,7 @@ class ReportsService
             ->get();
 
         // no stock
-        $noStock =  DB::table('inventory')
+        $noStock = DB::table('inventory')
             ->join('products', 'inventory.product_id', '=', 'products.id')
             ->whereNull('products.deleted_at')
             ->whereNull('inventory.deleted_at')
@@ -204,7 +212,7 @@ class ReportsService
             ->orderBy('products.name')
             ->get();
 
-        //product distribution by category
+        // product distribution by category
         $distCategory = DB::table('categories as a')
             ->join('products as b', 'b.category_id', '=', 'a.id')
             ->whereNull('a.deleted_at')
@@ -323,14 +331,13 @@ class ReportsService
         ];
     }
 
-
     // get Performance
 
     public function getPerformance($start = null, $end = null)
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_items');
-        $netQuantityExpression = "CASE WHEN (c.quantity - COALESCE(c.quantity_returned, 0)) > 0 THEN (c.quantity - COALESCE(c.quantity_returned, 0)) ELSE 0 END";
-        $validRevenueExpression = "CASE WHEN st.id IS NOT NULL AND st.status != 'voided' THEN c.unit_price * {$netQuantityExpression} ELSE 0 END";
+        $netQuantityExpression = 'CASE WHEN (c.quantity - COALESCE(c.quantity_returned, 0)) > 0 THEN (c.quantity - COALESCE(c.quantity_returned, 0)) ELSE 0 END';
+        $validRevenueExpression = "CASE WHEN st.id IS NOT NULL AND st.status != 'voided' THEN COALESCE(NULLIF(c.net_line_total, 0), c.unit_price * {$netQuantityExpression}) - COALESCE(c.refunded_line_amount, 0) ELSE 0 END";
 
         $revenueByCategory = DB::table('categories as a')
             ->leftJoin('products as b', 'a.id', '=', 'b.category_id')
@@ -346,7 +353,6 @@ class ReportsService
             ->groupBy('a.name')
             ->orderBy('a.name')
             ->get();
-
 
         $revenueByBrand = DB::table('brands as a')
             ->leftJoin('products as b', 'a.id', '=', 'b.brand_id')
@@ -373,7 +379,7 @@ class ReportsService
                 'p.id as product_id',
                 'p.name as product_name',
                 DB::raw("SUM({$netQuantityExpression}) as quantity_sold"),
-                DB::raw("SUM(c.unit_price * {$netQuantityExpression}) as revenue")
+                DB::raw("SUM(COALESCE(NULLIF(c.net_line_total, 0), c.unit_price * {$netQuantityExpression}) - COALESCE(c.refunded_line_amount, 0)) as revenue")
             )
             ->groupBy('p.id', 'p.name')
             ->havingRaw("SUM({$netQuantityExpression}) > 0")
@@ -396,7 +402,6 @@ class ReportsService
         ];
     }
 
-
     public function getStockAdjustments($start = null, $end = null)
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_adjustments');
@@ -409,14 +414,13 @@ class ReportsService
         // Adjustment value
         $adjustmentValue = DB::table('stock_adjustments as a')
             ->join('stock_movements as b', 'a.id', '=', 'b.reference_id')
-            ->join('products as c', 'c.id', '=', 'b.product_id')
             ->where('b.reference_type', 'adjustment')
             ->whereBetween('a.created_at', [$start, $end])
             ->select(DB::raw("
             SUM(
                 CASE
-                    WHEN b.movement_type = 'in' THEN b.quantity * c.cost_price
-                    WHEN b.movement_type = 'out' THEN -b.quantity * c.cost_price
+                    WHEN b.movement_type = 'in' THEN b.quantity * a.unit_cost
+                    WHEN b.movement_type = 'out' THEN -b.quantity * a.unit_cost
                 END
             ) as adjustment_value
         "))
@@ -429,80 +433,86 @@ class ReportsService
             ->groupBy('reason')
             ->get();
 
+        $adjustments = DB::table('stock_adjustments as a')
+            ->join('stock_movements as b', function ($join) {
+                $join->on('a.id', '=', 'b.reference_id')->where('b.reference_type', 'adjustment');
+            })
+            ->join('products as c', 'c.id', '=', 'b.product_id')
+            ->leftJoin('users as d', 'd.id', '=', 'a.user_id')
+            ->whereBetween('a.created_at', [$start, $end])
+            ->select(
+                'a.id',
+                'a.reason',
+                'a.created_at',
+                'c.name as product_name',
+                'd.name as user_name',
+                DB::raw("CASE WHEN b.movement_type = 'in' THEN b.quantity ELSE -b.quantity END as quantity")
+            )
+            ->orderByDesc('a.created_at')
+            ->limit(100)
+            ->get();
+
         return [
-            'total_adjustments'       => $totalAdjustments,
-            'adjustments_value'       => $adjustmentValue,
-            'adjustments_by_reason'   => $reasonCounts
+            'total_adjustments' => $totalAdjustments,
+            'net_adjustment_value' => (float) $adjustmentValue,
+            'adjustments_value' => (float) $adjustmentValue,
+            'stock_adjustment_losses' => $this->financials->adjustmentLosses($start, $end),
+            'adjustments_by_reason' => $reasonCounts,
+            'adjustments' => $adjustments,
         ];
     }
-
 
     public function getProfitLossReport($start = null, $end = null)
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_movements');
 
-        // Revenue
-        $revenue = SalesTransaction::whereBetween('created_at', [$start, $end])
-            ->sum('total_amount');
-
-        // Cost of goods sold
-        $costOfGoods = DB::table('sales_items as a')
-            ->join('products as b', 'b.id', '=', 'a.product_id')
-            ->whereBetween('a.created_at', [$start, $end])
-            ->select(DB::raw('SUM(a.quantity * b.cost_price) as cost_of_goods'))
-            ->value('cost_of_goods') ?? 0;
+        $revenue = $this->financials->netSales($start, $end);
+        $costOfGoods = $this->financials->cogs($start, $end);
 
         // Gross profit
         $grossProfit = $revenue - $costOfGoods;
 
-
-
-        $adjustmentLoss = DB::table('stock_adjustments as a')
-            ->join('stock_movements as b', 'a.id', '=', 'b.reference_id')
-            ->join('products as c', 'c.id', '=', 'b.product_id')->where('reference_type', 'adjustment')
-            ->where('movement_type', 'out')->whereBetween('a.created_at', [$start, $end])->select(DB::raw('SUM(b.quantity * c.cost_price) as total_cost'))
-            ->value('total_cost') ?? 0;
-
-        // Net profit
-        $netProfit = $grossProfit - $adjustmentLoss;
-
-        // Profit margin (%)
-        $profitMargin = $revenue > 0
-            ? round(($netProfit / $revenue) * 100, 2)
+        $adjustmentLoss = $this->financials->adjustmentLosses($start, $end);
+        $grossMargin = $revenue > 0
+            ? round(($grossProfit / $revenue) * 100, 2)
             : 0;
 
         return [
 
-            'revenue'         => $revenue,
-            'cost_of_goods'   => $costOfGoods,
-            'gross_profit'    => $grossProfit,
-            'adjustment_loss' => $adjustmentLoss,
-            'net_profit'      => $netProfit,
-            'profit_margin'   => $profitMargin,
+            'net_sales' => $revenue,
+            'cost_of_goods' => $costOfGoods,
+            'gross_profit' => $grossProfit,
+            'stock_adjustment_losses' => $adjustmentLoss,
+            'gross_margin' => $grossMargin,
         ];
     }
-
 
     public function getReportCSV($start, $end, $type)
     {
         switch ($type) {
             case 'sales':
                 $data = $this->getSalesReport($start, $end);
+
                 return $this->reportCSVService->exportSales($data);
             case 'purchase':
                 $data = $this->getPurchases($start, $end);
+
                 return $this->reportCSVService->exportPurchase($data);
             case 'inventory':
                 $data = $this->getInventory($start, $end);
+
                 return $this->reportCSVService->exportInventory($data);
             case 'performance':
                 $data = $this->getPerformance($start, $end);
+
                 return $this->reportCSVService->exportPerformance($data);
             case 'adjustments':
                 $data = $this->getStockAdjustments($start, $end);
+
                 return $this->reportCSVService->exportAdjustments($data);
             case 'profitloss':
                 $data = $this->getProfitLossReport($start, $end);
+
                 return $this->reportCSVService->exportProfitAndLoss($data);
         }
     }

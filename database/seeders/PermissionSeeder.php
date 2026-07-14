@@ -17,37 +17,36 @@ class PermissionSeeder extends Seeder
         $permissions = [];
 
         $permissionSets = [
-            'Dashboard' => ['View', 'Create'],
+            'Dashboard' => ['View', 'View Financial Data', 'Create'],
 
-            'Inventory'   => ['View', 'Create', 'Edit', 'Delete'],
-            'Products'    => ['View', 'Create', 'Edit', 'Delete'],
-            'Categories'  => ['View', 'Create', 'Edit', 'Delete'],
-            'Brands'      => ['View', 'Create', 'Edit', 'Delete'],
-            'Attributes'  => ['View', 'Create', 'Edit', 'Delete'],
-            'Suppliers'   => ['View', 'Create', 'Edit', 'Delete'],
-            'Purchases'   => ['View', 'Create', 'Edit', 'Delete'],
-            'Users'       => ['View', 'Create', 'Edit', 'Delete'],
-            'Roles'       => ['View', 'Create', 'Edit', 'Delete'],
+            'Products' => ['View', 'Create', 'Edit', 'Adjust Stock', 'Delete', 'Import', 'Export'],
+            'Categories' => ['View', 'Create', 'Edit', 'Delete'],
+            'Brands' => ['View', 'Create', 'Edit', 'Delete'],
+            'Attributes' => ['View', 'Create', 'Edit', 'Delete'],
+            'Suppliers' => ['View', 'Create', 'Edit', 'Delete'],
+            'Purchases' => ['View', 'Create', 'Edit', 'Delete'],
+            'Users' => ['View', 'Create', 'Edit', 'Delete', 'Manage Lower Scope', 'Manage All'],
+            'Roles' => ['View', 'Create', 'Edit', 'Delete'],
 
-            'POS' => ['Access', 'Create Transaction'],
+            'POS' => ['Access', 'Create Transaction', 'Request Discount', 'Authorize Discount'],
+
+            'Transactions' => ['View', 'View Own', 'View All', 'Export', 'Request Refund', 'Request Void', 'Refund', 'Void'],
 
             'Reports' => ['View', 'Export'],
 
             'Activity Logs' => ['View Own', 'View All', 'Export'],
 
-           
-            'Settings' => ['View', 'Edit'],
+            'Settings' => ['View', 'Edit', 'Manage Database'],
         ];
-
 
         foreach ($permissionSets as $module => $actions) {
             foreach ($actions as $action) {
                 $permissions[] = [
                     'name' => $action,
-                    'description'     => $action . ' ' . $module,
-                    'module'          => $module,
-                    'created_at'      => $timestamp,
-                    'updated_at'      => $timestamp,
+                    'description' => $action.' '.$module,
+                    'module' => $module,
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
                 ];
             }
         }

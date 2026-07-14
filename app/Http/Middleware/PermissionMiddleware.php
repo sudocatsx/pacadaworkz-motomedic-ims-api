@@ -15,19 +15,29 @@ class PermissionMiddleware
      */
     public function handle(Request $request, Closure $next, ...$permission): Response
     {
-         $user = auth('api')->user();
+        $user = auth('api')->user();
 
-        if (!$user || !$user->role) {
+        if (! $user || ! $user->role) {
             return response()->json([
                 'success' => false,
                 'data' => [
-                    'error' => 'Unauthorized'
-                ]
+                    'error' => 'Unauthorized',
+                ],
             ], 401);
         }
 
+        foreach ($permission as $permissions) {
+            if (str_contains($permissions, '.')) {
+                [$module, $name] = explode('.', $permissions, 2);
+                if ($user->role->permissions->contains(
+                    fn ($item) => $item->module === $module && $item->name === $name
+                )) {
+                    return $next($request);
+                }
 
- foreach ($permission as $permissions) {
+                continue;
+            }
+
             if ($user->role->permissions->contains('name', $permissions)) {
                 return $next($request);
             }
@@ -36,8 +46,8 @@ class PermissionMiddleware
         return response()->json([
             'success' => false,
             'data' => [
-                'error' => 'Forbidden'
-            ]
+                'error' => 'Forbidden',
+            ],
         ], 403);
 
     }

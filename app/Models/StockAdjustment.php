@@ -3,21 +3,31 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class StockAdjustment extends Model
 {
-    
-     // fillable is for mass assigment (allowed na ifill up)
-      protected $fillable = [
+    public $timestamps = false;
+
+    // fillable is for mass assigment (allowed na ifill up)
+    protected $fillable = [
         'user_id',
+        'product_id',
         'reason',
-        'notes'
+        'previous_quantity',
+        'counted_quantity',
+        'notes',
+        'unit_cost',
     ];
 
-     //Entity relationship to the user
-      public function user(): BelongsTo
+    // Entity relationship to the user
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 }

@@ -1,8 +1,8 @@
 <?php
 
 namespace App\Http\Controllers\API;
-use OpenApi\Annotations as OA;
 
+use OpenApi\Annotations as OA;
 
 /**
  * @OA\Info(
@@ -16,13 +16,13 @@ use OpenApi\Annotations as OA;
  *     description="Local Server"
  * )
  */
-
 abstract class Controller
 {
     /**
      * @OA\Get(
      *     path="/api/dummy",
      *     summary="Dummy endpoint",
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation"

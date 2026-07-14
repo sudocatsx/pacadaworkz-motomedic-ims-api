@@ -17,12 +17,12 @@ class ModuleMiddleware
     {
         $user = auth('api')->user();
 
-        if (!$user || !$user->role) {
+        if (! $user || ! $user->role) {
             return response()->json([
                 'success' => false,
                 'data' => [
-                    'error' => 'Unauthorized'
-                ]
+                    'error' => 'Unauthorized',
+                ],
             ], 401);
         }
 
@@ -35,8 +35,8 @@ class ModuleMiddleware
         return response()->json([
             'success' => false,
             'data' => [
-                'error' => 'Forbidden'
-            ]
+                'error' => 'Forbidden',
+            ],
         ], 403);
     }
 }

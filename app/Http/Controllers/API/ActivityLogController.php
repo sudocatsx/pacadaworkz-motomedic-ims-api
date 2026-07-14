@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\API;
 
-use Illuminate\Http\Request;
-use App\Services\ActivityLogService;
 use App\Http\Resources\ActivityLogResource;
+use App\Services\ActivityLogService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ActivityLogController extends Controller
@@ -24,8 +24,8 @@ class ActivityLogController extends Controller
         $canViewAll = $this->hasActivityLogsPermission($user, 'View All');
         $canViewOwn = $this->hasActivityLogsPermission($user, 'View Own');
 
-        if (!$canViewAll && !$canViewOwn) {
-            throw new AuthorizationException();
+        if (! $canViewAll && ! $canViewOwn) {
+            throw new AuthorizationException;
         }
 
         $filters = $this->validatedFilters($request);
@@ -58,8 +58,8 @@ class ActivityLogController extends Controller
         $canViewAll = $this->hasActivityLogsPermission($user, 'View All');
         $canViewOwn = $this->hasActivityLogsPermission($user, 'View Own');
 
-        if (!$this->hasActivityLogsPermission($user, 'Export') || (!$canViewAll && !$canViewOwn)) {
-            throw new AuthorizationException();
+        if (! $this->hasActivityLogsPermission($user, 'Export') || (! $canViewAll && ! $canViewOwn)) {
+            throw new AuthorizationException;
         }
 
         $filters = $this->validatedFilters($request);
@@ -108,11 +108,11 @@ class ActivityLogController extends Controller
 
     private function hasActivityLogsPermission($user, string $permissionName): bool
     {
-        if (!$user || !$user->role) {
+        if (! $user || ! $user->role) {
             return false;
         }
 
-        if (!$user->role->relationLoaded('permissions')) {
+        if (! $user->role->relationLoaded('permissions')) {
             $user->role->load('permissions');
         }
 

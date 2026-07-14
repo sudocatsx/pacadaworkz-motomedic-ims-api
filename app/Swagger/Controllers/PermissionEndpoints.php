@@ -18,14 +18,18 @@ class PermissionEndpoints
      *      summary="Get list of permissions",
      *      description="Returns list of permissions",
      *      security={{"bearerAuth":{}}},
+     *
      *      @OA\Response(
      *          response=200,
      *          description="Successful operation",
+     *
      *          @OA\JsonContent(
+     *
      *              @OA\Property(property="success", type="boolean", example=true),
      *              @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Permission"))
      *          )
      *      ),
+     *
      *      @OA\Response(response="401", ref="#/components/responses/Unauthorized")
      * )
      */

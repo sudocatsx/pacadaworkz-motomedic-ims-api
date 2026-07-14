@@ -4,14 +4,13 @@ namespace App\Http\Controllers\API;
 
 use App\Exceptions\Purchase\PurchaseReceiveException;
 use App\Exceptions\Purchase\PurchaseUpdateException;
-use Illuminate\Support\Facades\Auth;
-use App\Http\Controllers\API\Controller;
-use App\Services\PurchaseService;
+use App\Http\Requests\Purchase\PurchaseOrdersRequest;
 use App\Http\Resources\PurchaseOrdersResource;
+use App\Services\PurchaseService;
+use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
-use App\Http\Requests\Purchase\PurchaseOrdersRequest;
-use Exception;
+use Illuminate\Support\Facades\Auth;
 
 class PurchaseController extends Controller
 {
@@ -39,12 +38,12 @@ class PurchaseController extends Controller
                     'per_page' => $result->perPage(),
                     'total' => $result->total(),
                     'total_pages' => $result->lastPage(),
-                ]
+                ],
             ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred'
+                'message' => 'An error occurred',
             ], 500);
         }
     }
@@ -56,15 +55,16 @@ class PurchaseController extends Controller
     {
         try {
             $result = $this->purchaseService->createPurchase($request->validated());
+
             return response()->json([
                 'success' => true,
-                'data' => new PurchaseOrdersResource($result)
+                'data' => new PurchaseOrdersResource($result),
             ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 // 'message' => $e->getMessage()
-                'message' => 'An error occurred'
+                'message' => 'An error occurred',
             ], 500);
         }
     }
@@ -76,19 +76,20 @@ class PurchaseController extends Controller
     {
         try {
             $result = $this->purchaseService->findPurchase($id);
+
             return response()->json([
                 'success' => true,
-                'data' => new PurchaseOrdersResource($result)
+                'data' => new PurchaseOrdersResource($result),
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Purchase order not found.'
+                'message' => 'Purchase order not found.',
             ], 404);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred'
+                'message' => 'An error occurred',
             ], 500);
         }
     }
@@ -100,24 +101,25 @@ class PurchaseController extends Controller
     {
         try {
             $result = $this->purchaseService->updatePurchase($id, $request->validated());
+
             return response()->json([
                 'success' => true,
-                'data' => new PurchaseOrdersResource($result)
+                'data' => new PurchaseOrdersResource($result),
             ]);
         } catch (PurchaseUpdateException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Purchase order not found.'
+                'message' => 'Purchase order not found.',
             ], 404);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred'
+                'message' => 'An error occurred',
             ], 500);
         }
     }
@@ -129,26 +131,27 @@ class PurchaseController extends Controller
     {
         try {
             $this->purchaseService->deletePurchase($id);
+
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'message' => 'Purchase order deleted successfully'
-                ]
+                    'message' => 'Purchase order deleted successfully',
+                ],
             ]);
         } catch (PurchaseUpdateException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Purchase order not found.'
+                'message' => 'Purchase order not found.',
             ], 404);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred'
+                'message' => 'An error occurred',
             ], 500);
         }
     }
@@ -161,9 +164,10 @@ class PurchaseController extends Controller
         $userId = Auth::id();
         try {
             $result = $this->purchaseService->receivePurchase($id, $userId);
+
             return response()->json([
                 'success' => true,
-                'data' => new PurchaseOrdersResource($result)
+                'data' => new PurchaseOrdersResource($result),
             ]);
         } catch (PurchaseReceiveException $e) {
             return response()->json([
@@ -173,12 +177,12 @@ class PurchaseController extends Controller
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Purchase order not found.'
+                'message' => 'Purchase order not found.',
             ], 404);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred'
+                'message' => 'An error occurred',
             ], 500);
         }
     }

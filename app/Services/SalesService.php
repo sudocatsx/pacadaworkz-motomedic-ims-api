@@ -2,20 +2,19 @@
 
 namespace App\Services;
 
-use App\Exceptions\Sales\SalesTransactionNotFoundException;
 use App\Exceptions\Sales\InvalidRefundSalesTransactionException;
+use App\Exceptions\Sales\SalesTransactionNotFoundException;
 use App\Models\Inventory;
 use App\Models\SalesTransaction;
-use App\Models\SystemSetting;
-use Illuminate\Support\Facades\DB;
-
 use App\Models\StockMovement;
+use App\Models\SystemSetting;
+use App\Models\TransactionAuthorization;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class SalesService
 {
-    public function __construct(private ActivityLogService $activityLogService)
-    {
-    }
+    public function __construct(private ActivityLogService $activityLogService) {}
 
     public function getAllSales($search = null, $filters = [])
     {
@@ -25,7 +24,7 @@ class SalesService
             $query->where('transaction_no', 'LIKE', "%{$search}%");
         }
 
-        if (!empty($filters)) {
+        if (! empty($filters)) {
             if (isset($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -48,25 +47,24 @@ class SalesService
 
     public function getSalesById($id)
     {
-        $salesTransaction = SalesTransaction::with(['user', 'sales_items.product'])->find($id);
+        $salesTransaction = SalesTransaction::with(['user', 'sales_items.product', 'authorizations'])->find($id);
 
-        if (!$salesTransaction)
-            throw new SalesTransactionNotFoundException();
+        if (! $salesTransaction) {
+            throw new SalesTransactionNotFoundException;
+        }
 
         return $salesTransaction;
     }
 
-    public function voidTransaction($userId, $salesId)
+    public function voidTransaction($userId, $salesId, ?string $reason = null, ?int $initiatorId = null)
     {
-        return DB::transaction(function () use ($userId, $salesId) {
+        return DB::transaction(function () use ($userId, $salesId, $reason, $initiatorId) {
             $salesTransaction = SalesTransaction::with('sales_items')
-                ->where([
-                    'id' => $salesId,
-                    'user_id' => $userId
-                ])->first();
+                ->where('id', $salesId)
+                ->first();
 
-            if (!$salesTransaction) {
-                throw new SalesTransactionNotFoundException();
+            if (! $salesTransaction) {
+                throw new SalesTransactionNotFoundException;
             }
 
             if ($salesTransaction->status === 'voided') {
@@ -74,7 +72,13 @@ class SalesService
             }
 
             if (in_array($salesTransaction->status, ['refunded', 'partially_refunded'], true)) {
-                throw new InvalidRefundSalesTransactionException();
+                throw new InvalidRefundSalesTransactionException;
+            }
+            if (! $salesTransaction->created_at->isSameDay(now())) {
+                throw new InvalidRefundSalesTransactionException('Only same-day transactions can be voided.');
+            }
+            if (! $reason) {
+                throw new InvalidRefundSalesTransactionException('A void reason is required.');
             }
 
             // Restore stock
@@ -82,35 +86,58 @@ class SalesService
                 $inventory = Inventory::where('product_id', $item->product_id)->first();
                 if ($inventory) {
                     $inventory->increment('quantity', $item->quantity);
+
+                    StockMovement::create([
+                        'product_id' => $item->product_id,
+                        'user_id' => $userId,
+                        'movement_type' => 'in',
+                        'quantity' => $item->quantity,
+                        'reference_type' => 'void',
+                        'reference_id' => $salesTransaction->id,
+                        'notes' => "Voided Sale - Transaction #{$salesTransaction->transaction_no}: {$reason}",
+                    ]);
                 }
             }
 
             $salesTransaction->status = 'voided';
             $salesTransaction->save();
 
+            $this->recordAuthorization(
+                $salesTransaction,
+                'void',
+                $initiatorId ?? $userId,
+                $userId,
+                [
+                    'reason' => $reason,
+                    'items' => $salesTransaction->sales_items->map(fn ($item) => [
+                        'sales_item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product?->name,
+                        'quantity' => (int) $item->quantity,
+                    ])->values()->all(),
+                ]
+            );
+
             $this->activityLogService->log(
-                module: 'Sales',
+                module: 'Transactions',
                 action: 'Void transaction',
-                description: "Voided sales transaction #{$salesTransaction->transaction_no}",
-                userId: $userId
+                description: 'Initiator #'.($initiatorId ?? $userId)." authorized by #{$userId}; voided #{$salesTransaction->transaction_no}: {$reason}",
+                userId: $initiatorId ?? $userId
             );
 
             return $salesTransaction;
         });
     }
 
-    public function refundTransaction($userId, $salesId, $data)
+    public function refundTransaction($userId, $salesId, $data, ?int $initiatorId = null)
     {
-        return DB::transaction(function () use ($userId, $salesId, $data) {
+        return DB::transaction(function () use ($userId, $salesId, $data, $initiatorId) {
             $salesTransaction = SalesTransaction::with('sales_items')
-                ->where([
-                    'id' => $salesId,
-                    'user_id' => $userId
-                ])
+                ->where('id', $salesId)
                 ->first();
 
-            if (!$salesTransaction) {
-                throw new SalesTransactionNotFoundException();
+            if (! $salesTransaction) {
+                throw new SalesTransactionNotFoundException;
             }
 
             if ($salesTransaction->status === 'voided') {
@@ -122,6 +149,7 @@ class SalesService
             }
 
             $refundAmount = 0;
+            $eventItems = [];
             $refundType = $data['refund_type'] ?? 'partial';
             $mainReason = $data['reason'] ?? null;
 
@@ -143,11 +171,20 @@ class SalesService
                             'quantity' => $remainingQty,
                             'reference_type' => 'return',
                             'reference_id' => $salesTransaction->id,
-                            'notes' => 'Full Refund: ' . $mainReason
+                            'notes' => 'Full Refund: '.$mainReason,
                         ]);
 
                         $item->quantity_returned = $item->quantity;
+                        $lineRefund = max(0, (float) $item->net_line_total - (float) $item->refunded_line_amount);
+                        $item->refunded_line_amount += $lineRefund;
                         $item->save();
+                        $eventItems[] = [
+                            'sales_item_id' => $item->id,
+                            'product_id' => $item->product_id,
+                            'product_name' => $item->product?->name,
+                            'quantity' => (int) $remainingQty,
+                            'amount' => $lineRefund,
+                        ];
                     }
                 }
                 $refundAmount = $salesTransaction->total_amount - $salesTransaction->refund_amount;
@@ -157,7 +194,7 @@ class SalesService
                 foreach ($data['refund_items'] as $refundItem) {
                     $item = $salesTransaction->sales_items->where('id', $refundItem['sales_item_id'])->first();
 
-                    if (!$item) {
+                    if (! $item) {
                         throw new InvalidRefundSalesTransactionException("Invalid sales item ID: {$refundItem['sales_item_id']} does not belong to this transaction.");
                     }
 
@@ -182,13 +219,26 @@ class SalesService
                         'quantity' => $qtyToRefund,
                         'reference_type' => 'return',
                         'reference_id' => $salesTransaction->id,
-                        'notes' => 'Partial Refund: ' . ($refundItem['reason'] ?? $mainReason)
+                        'notes' => 'Partial Refund: '.($refundItem['reason'] ?? $mainReason),
                     ]);
 
                     $item->quantity_returned += $qtyToRefund;
                     $item->save();
 
-                    $refundAmount += $item->unit_price * $qtyToRefund;
+                    $perUnitNet = $item->quantity > 0 ? ((float) $item->net_line_total / $item->quantity) : 0;
+                    $lineRefund = round($perUnitNet * $qtyToRefund, 2);
+                    $remainingLineAmount = (float) $item->net_line_total - (float) $item->refunded_line_amount;
+                    $lineRefund = min($lineRefund, $remainingLineAmount);
+                    $item->refunded_line_amount += $lineRefund;
+                    $item->save();
+                    $refundAmount += $lineRefund;
+                    $eventItems[] = [
+                        'sales_item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product?->name,
+                        'quantity' => (int) $qtyToRefund,
+                        'amount' => $lineRefund,
+                    ];
                 }
             }
 
@@ -204,13 +254,26 @@ class SalesService
 
             $salesTransaction->save();
 
+            $this->recordAuthorization(
+                $salesTransaction,
+                'refund',
+                $initiatorId ?? $userId,
+                $userId,
+                [
+                    'reason' => $mainReason,
+                    'refund_type' => $refundType,
+                    'refund_amount' => $refundAmount,
+                    'items' => $eventItems,
+                ]
+            );
+
             $refundTypeDescription = ($refundType === 'full') ? 'Fully' : 'Partially';
 
             $this->activityLogService->log(
-                module: 'Sales',
+                module: 'Transactions',
                 action: 'Refund',
-                description: "{$refundTypeDescription} refunded {$refundAmount} for sales transaction #{$salesTransaction->transaction_no}",
-                userId: $userId
+                description: 'Initiator #'.($initiatorId ?? $userId)." authorized by #{$userId}; {$refundTypeDescription} refunded {$refundAmount} for #{$salesTransaction->transaction_no}",
+                userId: $initiatorId ?? $userId
             );
 
             return $salesTransaction;
@@ -221,8 +284,8 @@ class SalesService
     {
         $transaction = SalesTransaction::with(['user', 'sales_items.product'])->find($id);
 
-        if (!$transaction) {
-            throw new SalesTransactionNotFoundException();
+        if (! $transaction) {
+            throw new SalesTransactionNotFoundException;
         }
 
         // Fetch System Settings
@@ -233,7 +296,7 @@ class SalesService
             'logo_url',
             'tax_id',
             'footer_message',
-            'return_policy'
+            'return_policy',
         ])->pluck('setting_value', 'setting_key');
 
         return [
@@ -275,7 +338,33 @@ class SalesService
             'footer' => [
                 'message' => $settings['footer_message'] ?? 'Thank you for your business!',
                 'return_policy' => $settings['return_policy'] ?? 'No return, no exchange.',
-            ]
+            ],
+        ];
+    }
+
+    private function recordAuthorization(SalesTransaction $transaction, string $action, int $initiatorId, int $authorizerId, array $details): void
+    {
+        TransactionAuthorization::create([
+            'sales_transaction_id' => $transaction->id,
+            'action' => $action,
+            'result' => 'authorized',
+            'initiator_id' => $initiatorId,
+            'authorizer_id' => $authorizerId,
+            'initiator_snapshot' => $this->actorSnapshot($initiatorId),
+            'authorizer_snapshot' => $this->actorSnapshot($authorizerId),
+            'details' => $details,
+            'authorized_at' => now(),
+        ]);
+    }
+
+    private function actorSnapshot(int $userId): array
+    {
+        $user = User::with('role')->find($userId);
+
+        return [
+            'id' => $userId,
+            'name' => $user?->name ?? 'Deleted user',
+            'role' => $user?->role?->role_name,
         ];
     }
 }

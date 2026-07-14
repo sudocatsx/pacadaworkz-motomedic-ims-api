@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\API\Controller;
 use App\Http\Requests\SupplierRequest;
 use App\Http\Resources\SupplierResource;
 use App\Services\SupplierService;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class SupplierController extends Controller
@@ -25,7 +24,7 @@ class SupplierController extends Controller
             $search = $request->query('search', null);
             $perPage = $request->query('per_page', 10);
             $suppliers = $this->supplierService->getAllSuppliers($search, $perPage);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => SupplierResource::collection($suppliers),
@@ -34,13 +33,13 @@ class SupplierController extends Controller
                     'per_page' => $suppliers->perPage(),
                     'total' => $suppliers->total(),
                     'last_page' => $suppliers->lastPage(),
-                    'total_pages' => $suppliers->lastPage()
-                ]
+                    'total_pages' => $suppliers->lastPage(),
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' =>  'An error occured',
+                'message' => 'An error occured',
             ], 500);
         }
     }
@@ -49,14 +48,15 @@ class SupplierController extends Controller
     {
         try {
             $supplier = $this->supplierService->createSupplier($request->validated());
+
             return response()->json([
                 'success' => true,
-                'data' => new SupplierResource($supplier)
+                'data' => new SupplierResource($supplier),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' =>  'An error occured',
+                'message' => 'An error occured',
             ], 500);
         }
     }
@@ -65,19 +65,20 @@ class SupplierController extends Controller
     {
         try {
             $supplier = $this->supplierService->getSupplierById($id);
+
             return response()->json([
                 'success' => true,
-                'data' => new SupplierResource($supplier)
+                'data' => new SupplierResource($supplier),
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Supplier not found'
+                'message' => 'Supplier not found',
             ], 404);
         } catch (ConflictHttpException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 409);
         } catch (\Exception $e) {
             return response()->json([
@@ -91,14 +92,15 @@ class SupplierController extends Controller
     {
         try {
             $supplier = $this->supplierService->updateSupplier($request->validated(), $id);
+
             return response()->json([
                 'success' => true,
-                'data' => new SupplierResource($supplier)
+                'data' => new SupplierResource($supplier),
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Supplier not found'
+                'message' => 'Supplier not found',
             ], 404);
         } catch (\Exception $e) {
             return response()->json([
@@ -112,19 +114,20 @@ class SupplierController extends Controller
     {
         try {
             $this->supplierService->deleteSupplier($id);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Supplier deleted successfully'
+                'message' => 'Supplier deleted successfully',
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Supplier not found'
+                'message' => 'Supplier not found',
             ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' =>  'An error occured',
+                'message' => 'An error occured',
             ], 500);
         }
     }

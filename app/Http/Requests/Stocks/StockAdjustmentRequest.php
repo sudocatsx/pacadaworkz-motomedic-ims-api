@@ -21,18 +21,10 @@ class StockAdjustmentRequest extends FormRequest
      */
     public function rules(): array
     {
-        if ($this->isMethod('post')) {
-            return [
-                'product_id' => 'required|integer|exists:products,id',
-                'reason' => 'required|string|in:damaged,refunded',
-                'quantity' => 'required|integer|not_in:0',
-                'notes' => 'nullable|string',
-            ];
-        }
-
         return [
-            'reason' => 'sometimes|string|in:damaged,refunded',
-            'notes' => 'nullable|string',
+            'counted_quantity' => 'required|integer|min:0',
+            'reason' => 'required|string|in:physical_count,damaged,found_stock,data_correction',
+            'notes' => 'nullable|string|max:500',
         ];
     }
 }

@@ -4,12 +4,11 @@ namespace App\Http\Controllers\API;
 
 use App\Exceptions\Sales\InvalidRefundSalesTransactionException;
 use App\Exceptions\Sales\SalesTransactionNotFoundException;
-use App\Http\Controllers\API\Controller;
 // use App\Http\Requests\Sales\VoidTransactionRequest;
 use App\Http\Requests\Sales\RefundTransactionRequest;
-use Illuminate\Http\Request;
-use App\Services\SalesService;
 use App\Http\Resources\SalesTransactionResource;
+use App\Services\SalesService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class SalesController extends Controller
@@ -38,11 +37,11 @@ class SalesController extends Controller
                     'current_page' => $result->currentPage(),
                     'per_page' => $result->perPage(),
                     'total' => $result->total(),
-                    'last_page' => $result->lastPage()
-                ]
+                    'last_page' => $result->lastPage(),
+                ],
             ]);
         } catch (\Exception $e) {
-            \Log::error('Sales Get All Error: ' . $e->getMessage());
+            \Log::error('Sales Get All Error: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -56,17 +55,18 @@ class SalesController extends Controller
     {
         try {
             $result = $this->salesService->getSalesById($id);
+
             return response()->json([
                 'success' => true,
-                'data' => new SalesTransactionResource($result)
+                'data' => new SalesTransactionResource($result),
             ]);
         } catch (SalesTransactionNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Sales transaction not found'
+                'message' => 'Sales transaction not found',
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Sales Get Error: ' . $e->getMessage());
+            \Log::error('Sales Get Error: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -83,10 +83,11 @@ class SalesController extends Controller
             // $validated = $request->validated();
 
             $result = $this->salesService->voidTransaction($userId, $id);
+
             return response()->json([
                 'success' => true,
                 'data' => $result,
-                'message' => 'Sales transaction void successfully'
+                'message' => 'Sales transaction void successfully',
             ], 200);
         } catch (InvalidRefundSalesTransactionException $e) {
             return response()->json([
@@ -96,14 +97,14 @@ class SalesController extends Controller
         } catch (SalesTransactionNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Sales transaction not found'
+                'message' => 'Sales transaction not found',
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Sales Void Transaction Error: ' . $e->getMessage());
+            \Log::error('Sales Void Transaction Error: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ], 500);
         }
     }
@@ -115,10 +116,11 @@ class SalesController extends Controller
             $data = $request->validated();
 
             $result = $this->salesService->refundTransaction($userId, $id, $data);
+
             return response()->json([
                 'success' => true,
                 'data' => new SalesTransactionResource($result),
-                'message' => 'Sales transaction refunded successfully'
+                'message' => 'Sales transaction refunded successfully',
             ], 200);
         } catch (InvalidRefundSalesTransactionException $e) {
             return response()->json([
@@ -128,10 +130,10 @@ class SalesController extends Controller
         } catch (SalesTransactionNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage() ?? 'Sales transaction not found'
+                'message' => $e->getMessage() ?? 'Sales transaction not found',
             ], $e->getCode());
         } catch (\Exception $e) {
-            \Log::error('Sales Refund Transaction Error: ' . $e->getMessage());
+            \Log::error('Sales Refund Transaction Error: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -141,21 +143,22 @@ class SalesController extends Controller
         }
     }
 
-    public function receipt(int $id) {
+    public function receipt(int $id)
+    {
         try {
             $data = $this->salesService->getReceiptData($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $data
+                'data' => $data,
             ]);
         } catch (SalesTransactionNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Sales transaction not found'
+                'message' => 'Sales transaction not found',
             ], 404);
         } catch (\Exception $e) {
-            \Log::error('Sales Transaction Receipt Error: ' . $e->getMessage());
+            \Log::error('Sales Transaction Receipt Error: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,

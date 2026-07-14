@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\API\Controller;
 use App\Services\CatalogImportService;
 use App\Services\SpreadsheetService;
 use Illuminate\Http\Request;
@@ -13,8 +12,7 @@ class CatalogImportController extends Controller
     public function __construct(
         private readonly CatalogImportService $catalogImportService,
         private readonly SpreadsheetService $spreadsheetService
-    ) {
-    }
+    ) {}
 
     public function template(Request $request)
     {
@@ -23,8 +21,9 @@ class CatalogImportController extends Controller
         ]);
 
         $type = $validated['type'] ?? null;
+        $this->assertProductImportPermission($type);
         $path = $this->spreadsheetService->createXlsx($this->catalogImportService->templateSheets($type));
-        $filename = ($type ?: 'catalog') . '-import-template.xlsx';
+        $filename = ($type ?: 'catalog').'-import-template.xlsx';
 
         return response()
             ->download($path, $filename, [
@@ -39,6 +38,7 @@ class CatalogImportController extends Controller
             'file' => ['required', 'file', 'max:10240', 'mimes:xlsx,csv,txt'],
             'type' => ['nullable', Rule::in(['categories', 'brands', 'attributes', 'suppliers', 'products'])],
         ]);
+        $this->assertProductImportPermission($validated['type'] ?? null);
 
         $file = $validated['file'];
         $extension = strtolower($file->getClientOriginalExtension());
@@ -54,5 +54,17 @@ class CatalogImportController extends Controller
             'success' => true,
             'data' => $summary,
         ]);
+    }
+
+    private function assertProductImportPermission(?string $type): void
+    {
+        if ($type !== 'products') {
+            return;
+        }
+
+        $allowed = auth('api')->user()?->role?->permissions
+            ?->contains(fn ($permission) => $permission->module === 'Products' && $permission->name === 'Import');
+
+        abort_unless($allowed, 403, 'Forbidden');
     }
 }

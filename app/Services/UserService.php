@@ -1,13 +1,12 @@
 <?php
 
-
 namespace App\Services;
 
 use App\Exceptions\Auth\UserNotFoundException;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use App\Services\ActivityLogService; // Added for activity logging
+
+// Added for activity logging
 
 class UserService
 {
@@ -20,7 +19,7 @@ class UserService
 
     public function getAllUsers(array $params)
     {
-        $query = User::query();
+        $query = User::with('role');
 
         /**
          * Searching Logic
@@ -38,6 +37,9 @@ class UserService
         if (isset($params['role_id'])) {
             $query->where('role_id', $params['role_id']);
         }
+        if (isset($params['allowed_role_ids'])) {
+            $query->whereIn('role_id', $params['allowed_role_ids']);
+        }
         /**
          * Sorting Logic
          **/
@@ -49,6 +51,7 @@ class UserService
          * Pagination Logic, so abstract hahaha...
          **/
         $limit = $params['limit'] ?? 10;
+
         return $query->paginate($limit);
     }
 
@@ -56,7 +59,10 @@ class UserService
     {
         // return User::find($id);
         $user = User::with('role')->find($id);
-        if (!$user) throw new UserNotFoundException($id, 'id');
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
+
         return $user;
     }
 
@@ -65,7 +71,6 @@ class UserService
         $isDefaultPassword = $fields['is_default_password'];
         unset($fields['is_default_password']);
         /**
-         *
          * if `isDefaultPassword` is set to TRUE override the `password` field by USER_DEFAULT_PASSWORD,
          * NOTE: set niyo yung USER_DEFAULT_PASSWORD sa .env
          *
@@ -84,6 +89,7 @@ class UserService
                 'Restored and Updated',
                 "Restored and updated user: {$user->email} (ID: {$user->id})"
             );
+
             return $user;
         }
         $user = User::create($fields);
@@ -92,13 +98,16 @@ class UserService
             'Created',
             "Created new user: {$user->email} (ID: {$user->id})"
         );
+
         return $user;
     }
 
     public function updateUserById(int $id, array $fields)
     {
         $user = User::find($id);
-        if (!$user) throw new UserNotFoundException($id, 'id');
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
         // if (isset($fields['password'])) {
         //     unset($fields['password']);
         // }
@@ -111,6 +120,7 @@ class UserService
             'Updated',
             "Updated user: {$user->email} (ID: {$user->id})"
         );
+
         return $user;
     }
 
@@ -118,7 +128,9 @@ class UserService
     {
         // return User::destroy($id);
         $user = User::find($id);
-        if (!$user) throw new UserNotFoundException($id, 'id');
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
 
         $user->delete();
         $this->activityLogService->log(
@@ -126,6 +138,7 @@ class UserService
             'Deleted',
             "Deleted user: {$user->email} (ID: {$user->id})"
         );
+
         return true;
     }
 
@@ -133,12 +146,13 @@ class UserService
     {
         $user = User::find($id);
 
-        if (!$user) throw new UserNotFoundException($id, 'id');
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
 
         if ($user) {
             $isDefaultPassword = $fields['is_default_password'];
             /**
-             *
              * if `isDefaultPassword` is set to TRUE override the `newPassword` field by USER_DEFAULT_PASSWORD,
              * NOTE: set niyo yung USER_DEFAULT_PASSWORD sa .env
              *
@@ -146,23 +160,45 @@ class UserService
             $newPassword = $isDefaultPassword ? env('USER_DEFAULT_PASSWORD', 'Password@2025!') : $fields['new_password'];
 
             $user->update([
-                'password' => Hash::make($newPassword)
+                'password' => Hash::make($newPassword),
             ]);
             $this->activityLogService->log(
                 'User',
                 'Password Reset',
                 "Password reset for user: {$user->email} (ID: {$user->id})"
             );
+
             return true;
         }
 
         return false;
     }
 
-    public function changePasswordById(int $id, array $fields) {
+    public function clearAuthorizationPinById(int $id, int $actorId): User
+    {
+        $user = User::find($id);
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
+
+        $user->update(['authorization_pin' => null]);
+        $this->activityLogService->log(
+            'Users',
+            'Clear authorization PIN',
+            "Cleared authorization PIN enrollment for {$user->email} (ID: {$user->id})",
+            $actorId
+        );
+
+        return $user;
+    }
+
+    public function changePasswordById(int $id, array $fields)
+    {
         $user = User::find($id);
 
-        if (!$user) throw new UserNotFoundException($id, 'id');
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
 
         // $currentPassword = $fields['current_password'];
         $newPassword = $fields['new_password'];
@@ -172,7 +208,7 @@ class UserService
         // if (!Hash::check($currentPassword, $user->password))
 
         $user->update([
-            'password' => Hash::make($newPassword)
+            'password' => Hash::make($newPassword),
         ]);
 
         $this->activityLogService->log(
@@ -187,16 +223,19 @@ class UserService
     public function updateThemeById(int $id, array $fields)
     {
         $user = User::find($id);
-        if (!$user) throw new UserNotFoundException($id, 'id');
+        if (! $user) {
+            throw new UserNotFoundException($id, 'id');
+        }
 
         $user->update([
-            'theme' => $fields['theme']
+            'theme' => $fields['theme'],
         ]);
         $this->activityLogService->log(
             'User',
             'Theme Updated',
             "Theme updated for user: {$user->email} (ID: {$user->id}) to {$fields['theme']}"
         );
+
         return $user;
     }
 }

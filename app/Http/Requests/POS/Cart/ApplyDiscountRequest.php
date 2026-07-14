@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests\POS\Cart;
 
-use Illuminate\Foundation\Http\FormRequest;
 use App\Services\PosService;
-use Illuminate\Validation\Rule;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ApplyDiscountRequest extends FormRequest
 {
@@ -32,6 +32,8 @@ class ApplyDiscountRequest extends FormRequest
                 // Rule::when($this->input('discount_type') === 'percentage', ['max:100']),
             ],
             'discount_type' => ['required', 'string', 'in:fixed,percentage'],
+            'authorizer_id' => ['required', 'integer', 'exists:users,id'],
+            'pin' => ['required', 'digits:6'],
         ];
     }
 

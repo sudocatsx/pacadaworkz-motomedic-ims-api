@@ -2,26 +2,25 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class ProductAttribute extends Pivot
 {
     use SoftDeletes;
-    
+
     //
 
-
     protected $table = 'product_attributes';
- 
+
     protected $dates = ['deleted_at'];
 
-// fillable is for mass assigment (allowed na ifill up)
-      protected $fillable = [
+    // fillable is for mass assigment (allowed na ifill up)
+    protected $fillable = [
         'attribute_value_id',
-        'product_id'
+        'product_id',
     ];
-
 
     //  public function attribute(): BelongsTo
     // {
@@ -37,5 +36,4 @@ class ProductAttribute extends Pivot
     {
         return $this->belongsTo(AttributesValue::class, 'attribute_value_id');
     }
-
 }

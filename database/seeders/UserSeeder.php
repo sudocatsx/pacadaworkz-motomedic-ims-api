@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,45 +14,71 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        $roleIds = Role::query()
+            ->whereIn('role_name', ['superadmin', 'admin', 'manager', 'staff'])
+            ->pluck('id', 'role_name');
+
+        $password = 'Pacadaworkz@2026!';
         $users = [
             [
-                "role_id" => 1,
-                "name" => "Superadmin Domdom",
-                "email" => "domdomkenneth23@gmail.com",
-                "password" => Hash::make("superadmin"),
-                "first_name" => "Super",
-                "last_name" => "admin"
+                'account' => 'Owner',
+                'role_name' => 'superadmin',
+                'name' => 'Superadmin Pacada',
+                'email' => 'superadminpacada@gmail.com',
+                'first_name' => 'Superadmin',
+                'last_name' => 'Pacada',
             ],
             [
-                "role_id" => 2,
-                "name" => "Admin Asher",
-                "email" => "asherjohn48@gmail.com",
-                "password" => Hash::make("admin"),
-                "first_name" => "Admin",
-                "last_name" => "admin"
+                'account' => 'Developer',
+                'role_name' => 'admin',
+                'name' => 'Admin Pacada',
+                'email' => 'asherjohn48@gmail.com',
+                'first_name' => 'Admin',
+                'last_name' => 'Pacada',
             ],
             [
-                "role_id" => 3,
-                "name" => "Staff Sharks",
-                "email" => "sharkspin@gmail.com",
-                "password" => Hash::make("staff"),
-                "first_name" => "Staff",
-                "last_name" => "staff"
+                'account' => 'Manager',
+                'role_name' => 'manager',
+                'name' => 'Manager Pacada',
+                'email' => 'managerpacada@gmail.com',
+                'first_name' => 'Manager',
+                'last_name' => 'Pacada',
             ],
             [
-                "role_id" => 2,
-                "name" => "Admin Gab",
-                "email" => "johngabrielleofiangga@gmail.com",
-                "password" => Hash::make("admin"),
-                "first_name" => "admin",
-                "last_name" => "second"
+                'account' => 'Staff',
+                'role_name' => 'staff',
+                'name' => 'Staff Pacada',
+                'email' => 'staffpacada@gmail.com',
+                'first_name' => 'Staff',
+                'last_name' => 'Pacada',
             ],
         ];
 
+        $credentials = [];
         foreach ($users as $user) {
+            $account = $user['account'];
+            $roleName = $user['role_name'];
+            unset($user['account']);
+            unset($user['role_name']);
+            $user['role_id'] = $roleIds->get($roleName)
+                ?? throw new \RuntimeException("Role [{$roleName}] must be seeded before users.");
+            $user['password'] = Hash::make($password);
+            $user['is_active'] = true;
+
             DB::table('users')->updateOrInsert(
                 ['email' => $user['email']],
                 $user
+            );
+
+            $credentials[] = [$account, $roleName, $user['name'], $user['email'], $password];
+        }
+
+        if ($this->command) {
+            $this->command->newLine();
+            $this->command->info('Demo account credentials');
+            $this->command->table(
+                ['Account', 'Role', 'Name', 'Email', 'Password'],
+                $credentials
             );
         }
     }

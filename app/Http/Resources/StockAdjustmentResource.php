@@ -16,9 +16,16 @@ class StockAdjustmentResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'user' => $this->user->name,
+            'product_id' => $this->product_id,
+            'user' => $this->user?->name,
             'reason' => $this->reason,
+            'previous_quantity' => $this->previous_quantity,
+            'counted_quantity' => $this->counted_quantity,
+            'delta' => $this->previous_quantity === null || $this->counted_quantity === null
+                ? null
+                : $this->counted_quantity - $this->previous_quantity,
             'notes' => $this->notes,
+            'created_at' => $this->created_at,
         ];
     }
 }

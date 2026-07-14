@@ -15,12 +15,12 @@ class RevenueByCategoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         // Since we want the output to be { "Category Name": numeric_value },
-        // and this resource might be used on a collection, 
+        // and this resource might be used on a collection,
         // we can handle the mapping here or in a static method.
-        
+
         // However, standard JsonResource::collection() will return [{...}, {...}].
         // The user wants a single object with key-value pairs.
-        
+
         return [
             $this->category_name => (float) $this->total_revenue,
         ];

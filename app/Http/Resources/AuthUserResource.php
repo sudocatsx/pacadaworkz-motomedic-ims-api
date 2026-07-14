@@ -35,6 +35,7 @@ class AuthUserResource extends JsonResource
             'deleted_at' => $this->deleted_at,
             'google_id' => $this->google_id,
             'theme' => $this->theme,
+            'authorization_pin_configured' => filled($this->authorization_pin),
         ];
     }
 }

@@ -7,5 +7,6 @@ use Exception;
 class EmptyCartException extends Exception
 {
     protected $message = 'Cart is empty';
+
     protected $code = 409;
 }
