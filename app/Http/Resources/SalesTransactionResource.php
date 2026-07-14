@@ -35,7 +35,9 @@ class SalesTransactionResource extends JsonResource
             'refund_amount' => (float) ($this->refund_amount ?? 0),
             'refund_reason' => $this->refund_reason,
             'refunded_at' => $this->refunded_at,
-            'net_sales' => max(0, (float) $this->total_amount - (float) ($this->refund_amount ?? 0)),
+            'net_sales' => $this->status === 'voided'
+                ? 0.0
+                : max(0, (float) $this->total_amount - (float) ($this->refund_amount ?? 0)),
             'created_at' => $this->created_at,
             'sales_item' => SalesItemResource::collection($this->whenLoaded('sales_items')),
             'authorization_history' => TransactionAuthorizationResource::collection($this->whenLoaded('authorizations')),

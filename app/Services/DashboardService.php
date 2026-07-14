@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
+    public function __construct(private readonly FinancialAggregationService $financials) {}
+
     // get dashboard stats
     public function getStats()
     {
@@ -51,25 +53,13 @@ class DashboardService
             return $stats;
         }
 
-        $todaysSales = (float) SalesTransaction::where('status', '!=', 'voided')
-            ->whereBetween('created_at', [$todayStart, $todayEnd])
-            ->sum(DB::raw('total_amount - refund_amount'));
-        $todaysCostOfGoodsSold = (float) DB::table('sales_items')
-            ->join('sales_transactions', 'sales_items.sales_transactions_id', '=', 'sales_transactions.id')
-            ->join('products', 'products.id', '=', 'sales_items.product_id')
-            ->where('sales_transactions.status', '!=', 'voided')
-            ->whereBetween('sales_transactions.created_at', [$todayStart, $todayEnd])
-            ->sum(DB::raw('(sales_items.quantity - sales_items.quantity_returned) * products.cost_price'));
-        $todaysStockAdjustmentLosses = (float) DB::table('stock_adjustments')
-            ->join('stock_movements', 'stock_adjustments.id', '=', 'stock_movements.reference_id')
-            ->join('products', 'products.id', '=', 'stock_movements.product_id')
-            ->where('stock_movements.reference_type', 'adjustment')
-            ->where('stock_movements.movement_type', 'out')
-            ->whereBetween('stock_adjustments.created_at', [$todayStart, $todayEnd])
-            ->sum(DB::raw('stock_movements.quantity * products.cost_price'));
+        $todaysSales = $this->financials->netSales($todayStart, $todayEnd);
+        $todaysCostOfGoodsSold = $this->financials->cogs($todayStart, $todayEnd);
+        $todaysStockAdjustmentLosses = $this->financials->adjustmentLosses($todayStart, $todayEnd);
 
         return array_merge($stats, [
             'todays_sales' => $todaysSales,
+            'todays_net_sales' => $todaysSales,
             'todays_transactions' => SalesTransaction::where('status', '!=', 'voided')->whereBetween('created_at', [$todayStart, $todayEnd])->count(),
             'todays_items_sold' => (int) SalesItem::join('sales_transactions', 'sales_items.sales_transactions_id', '=', 'sales_transactions.id')
                 ->where('sales_transactions.status', '!=', 'voided')
@@ -81,9 +71,9 @@ class DashboardService
                 ->sum('total_amount'),
             'todays_cost_of_goods_sold' => $todaysCostOfGoodsSold,
             'todays_stock_adjustment_losses' => $todaysStockAdjustmentLosses,
-            'todays_net_profit' => $todaysSales - $todaysCostOfGoodsSold - $todaysStockAdjustmentLosses,
+            'todays_gross_profit' => $todaysSales - $todaysCostOfGoodsSold,
             'total_products' => Product::count(),
-            'total_revenue' => (float) SalesTransaction::where('status', '!=', 'voided')->sum(DB::raw('subtotal - refund_amount')),
+            'total_revenue' => (float) SalesTransaction::sum(DB::raw(FinancialAggregationService::NET_SALES)),
             'total_transactions' => SalesTransaction::where('status', '!=', 'voided')->count(),
             'total_sales' => (int) SalesItem::join('sales_transactions', 'sales_items.sales_transactions_id', '=', 'sales_transactions.id')
                 ->where('sales_transactions.status', '!=', 'voided')
@@ -100,7 +90,8 @@ class DashboardService
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::now()->subDays($i)->format('Y-m-d');
             $dateConvert = Carbon::now()->subDays($i)->format('M d');
-            $total = SalesTransaction::whereDate('created_at', $date)->sum('subtotal');
+            $total = SalesTransaction::whereDate('created_at', $date)
+                ->sum(DB::raw(FinancialAggregationService::NET_SALES));
 
             $sales[$dateConvert] = $total;
         }
@@ -139,7 +130,7 @@ class DashboardService
         return Category::query()
             ->select(
                 'categories.name as category_name',
-                DB::raw('COALESCE(SUM(CASE WHEN sales_transactions.id IS NOT NULL THEN sales_items.unit_price * (sales_items.quantity - sales_items.quantity_returned) ELSE 0 END), 0) as total_revenue')
+                DB::raw("COALESCE(SUM(CASE WHEN sales_transactions.id IS NOT NULL THEN COALESCE(NULLIF(sales_items.net_line_total, 0), sales_items.unit_price * (sales_items.quantity - COALESCE(sales_items.quantity_returned, 0))) - COALESCE(sales_items.refunded_line_amount, 0) ELSE 0 END), 0) as total_revenue")
             )
             ->leftJoin('products', 'categories.id', '=', 'products.category_id')
             ->leftJoin('sales_items', 'products.id', '=', 'sales_items.product_id')
@@ -158,7 +149,7 @@ class DashboardService
         return Brand::query()
             ->select(
                 'brands.name as brand_name',
-                DB::raw('COALESCE(SUM(CASE WHEN sales_transactions.id IS NOT NULL THEN sales_items.unit_price * (sales_items.quantity - sales_items.quantity_returned) ELSE 0 END), 0) as total_revenue')
+                DB::raw("COALESCE(SUM(CASE WHEN sales_transactions.id IS NOT NULL THEN COALESCE(NULLIF(sales_items.net_line_total, 0), sales_items.unit_price * (sales_items.quantity - COALESCE(sales_items.quantity_returned, 0))) - COALESCE(sales_items.refunded_line_amount, 0) ELSE 0 END), 0) as total_revenue")
             )
             ->leftJoin('products', 'brands.id', '=', 'products.brand_id')
             ->leftJoin('sales_items', 'products.id', '=', 'sales_items.product_id')

@@ -17,6 +17,7 @@ class StockAdjustment extends Model
         'previous_quantity',
         'counted_quantity',
         'notes',
+        'unit_cost',
     ];
 
     // Entity relationship to the user

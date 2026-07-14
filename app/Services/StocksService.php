@@ -54,6 +54,7 @@ class StocksService
                 'previous_quantity' => $previousQuantity,
                 'counted_quantity' => $countedQuantity,
                 'notes' => $data['notes'] ?? null,
+                'unit_cost' => $product->cost_price,
             ]);
 
             $inventory->update(['quantity' => $countedQuantity]);

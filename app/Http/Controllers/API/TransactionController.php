@@ -73,16 +73,17 @@ class TransactionController extends Controller
             'Discount', 'Refund', 'Net Sales', 'Amount Tendered', 'Change',
         ]];
         foreach ($transactions as $transaction) {
+            $isVoided = $transaction->status === 'voided';
             $rows[] = [
                 $transaction->transaction_no,
                 $transaction->created_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                 optional($transaction->user)->name ?? 'Unknown',
                 strtoupper($transaction->payment_method),
                 ucwords(str_replace('_', ' ', $transaction->status)),
-                (float) $transaction->subtotal,
-                (float) $transaction->discount,
-                (float) $transaction->refund_amount,
-                max(0, (float) $transaction->total_amount - (float) $transaction->refund_amount),
+                $isVoided ? 0.0 : (float) $transaction->subtotal,
+                $isVoided ? 0.0 : (float) $transaction->discount,
+                $isVoided ? 0.0 : (float) $transaction->refund_amount,
+                $isVoided ? 0.0 : max(0, (float) $transaction->total_amount - (float) $transaction->refund_amount),
                 (float) $transaction->amount_tendered,
                 (float) $transaction->change,
             ];

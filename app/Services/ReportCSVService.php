@@ -13,7 +13,10 @@ class ReportCSVService
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
-        $csvData[] = ['Total Sales', $data['total_sales']];
+        $csvData[] = ['Gross Sales', $data['gross_sales']];
+        $csvData[] = ['Discounts', $data['discounts']];
+        $csvData[] = ['Refunds', $data['refunds']];
+        $csvData[] = ['Net Sales', $data['net_sales']];
         $csvData[] = ['Transactions', $data['transactions']];
         $csvData[] = ['Average Transaction', $data['average_transaction']];
         $csvData[] = []; // empty line
@@ -184,7 +187,8 @@ class ReportCSVService
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
         $csvData[] = ['Total Adjustments', $data['total_adjustments']];
-        $csvData[] = ['Adjustments Value', $data['adjustments_value']];
+        $csvData[] = ['Net Adjustment Value', $data['net_adjustment_value']];
+        $csvData[] = ['Stock Adjustment Losses', $data['stock_adjustment_losses']];
         $csvData[] = [];
         $csvData[] = ['Adjustments by Reason'];
         $csvData[] = ['Reason', 'Count'];
@@ -204,12 +208,11 @@ class ReportCSVService
     {
         $csvData = [];
         $csvData[] = ['Metric', 'Value'];
-        $csvData[] = ['Revenue', $data['revenue']];
+        $csvData[] = ['Net Sales', $data['net_sales']];
         $csvData[] = ['Cost of Goods Sold', $data['cost_of_goods']];
         $csvData[] = ['Gross Profit', $data['gross_profit']];
-        $csvData[] = ['Adjustment Loss', $data['adjustment_loss']];
-        $csvData[] = ['Net Profit', $data['net_profit']];
-        $csvData[] = ['Profit Margin (%)', $data['profit_margin']];
+        $csvData[] = ['Gross Margin (%)', $data['gross_margin']];
+        $csvData[] = ['Stock Adjustment Losses', $data['stock_adjustment_losses']];
 
         return $csvData;
     }

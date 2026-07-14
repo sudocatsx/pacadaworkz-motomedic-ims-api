@@ -224,7 +224,7 @@ test('dashboard revenue by brand includes zero revenue brands and excludes voide
         ->assertJsonPath('data.Motomedic', 0);
 });
 
-test('dashboard stats return today sales purchases net profit and stock alerts', function () {
+test('dashboard stats return today net sales purchases gross profit adjustment losses and stock alerts', function () {
     Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
 
     $user = dashboardUserForRole();
@@ -254,12 +254,13 @@ test('dashboard stats return today sales purchases net profit and stock alerts',
     $response->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.todays_sales', 350)
+        ->assertJsonPath('data.todays_net_sales', 350)
         ->assertJsonPath('data.todays_transactions', 1)
         ->assertJsonPath('data.todays_items_sold', 4)
         ->assertJsonPath('data.todays_purchases', 1000)
         ->assertJsonPath('data.todays_cost_of_goods_sold', 160)
         ->assertJsonPath('data.todays_stock_adjustment_losses', 80)
-        ->assertJsonPath('data.todays_net_profit', 110)
+        ->assertJsonPath('data.todays_gross_profit', 190)
         ->assertJsonPath('data.low_stock', 1)
         ->assertJsonPath('data.out_of_stock', 1);
 });
@@ -337,7 +338,7 @@ test('built-in financial roles and a custom role with both permissions receive f
             ->assertOk()
             ->assertJsonStructure(['data' => [
                 'my_transactions_today', 'my_items_sold_today', 'low_stock', 'out_of_stock',
-                'todays_sales', 'todays_purchases', 'todays_net_profit', 'total_revenue',
+                'todays_net_sales', 'todays_purchases', 'todays_gross_profit', 'total_revenue',
             ]]);
 
         $this->actingAs($user, 'api')

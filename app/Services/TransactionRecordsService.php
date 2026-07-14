@@ -65,6 +65,8 @@ class TransactionRecordsService
         $query = $this->filteredQuery($filters);
         $active = (clone $query)->where('status', '!=', 'voided');
         $grossSales = (float) (clone $active)->sum('subtotal');
+        $discounts = (float) (clone $active)->sum('discount');
+        $refunds = (float) (clone $active)->sum('refund_amount');
         $netSales = (float) (clone $active)
             ->selectRaw('COALESCE(SUM(total_amount - refund_amount), 0) as value')
             ->value('value');
@@ -98,7 +100,12 @@ class TransactionRecordsService
         return [
             'date' => $day->toDateString(),
             'summary' => $this->summary($filters),
-            'sales_overview' => ['gross_sales' => $grossSales, 'net_sales' => $netSales],
+            'sales_overview' => [
+                'gross_sales' => $grossSales,
+                'discounts' => $discounts,
+                'refunds' => $refunds,
+                'net_sales' => $netSales,
+            ],
             'payment_breakdown' => $paymentBreakdown,
             'products_sold' => $products,
         ];

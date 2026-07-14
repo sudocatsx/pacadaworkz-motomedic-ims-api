@@ -28,20 +28,29 @@ function reportsUserForRole(string $roleName = 'admin'): User
     ]);
 }
 
-function createSalesTransactionForDate(User $user, string $date, float $total): void
+function createSalesTransactionForDate(
+    User $user,
+    string $date,
+    float $subtotal,
+    float $discount = 0,
+    float $refund = 0,
+    string $status = 'completed',
+): void
 {
+    $total = $subtotal - $discount;
     DB::table('sales_transactions')->insert([
         'user_id' => $user->id,
         'transaction_no' => 'TXN-'.str_replace(['-', ' ', ':'], '', $date),
-        'subtotal' => $total,
+        'subtotal' => $subtotal,
         'tax' => 0,
-        'discount' => 0,
+        'discount' => $discount,
         'discount_type' => null,
         'total_amount' => $total,
+        'refund_amount' => $refund,
         'payment_method' => 'cash',
         'amount_tendered' => $total,
         'change' => 0,
-        'status' => 'completed',
+        'status' => $status,
         'created_at' => Carbon::parse($date),
         'updated_at' => Carbon::parse($date),
     ]);
@@ -206,6 +215,42 @@ test('weekly report period uses sunday through saturday instead of rolling seven
         'Juan Dela Cruz' => 300,
         'Maria Santos' => 200,
     ]);
+});
+
+test('sales report reconciles gross sales discounts refunds and net sales while excluding voids', function () {
+    Carbon::setTestNow(Carbon::parse('2026-07-08 12:00:00'));
+    $user = reportsUserForRole();
+    $user->update(['name' => 'Reconciliation Cashier']);
+
+    createSalesTransactionForDate($user, '2026-07-08 08:00:00', 200);
+    createSalesTransactionForDate($user, '2026-07-08 09:00:00', 200, 20);
+    createSalesTransactionForDate($user, '2026-07-08 10:00:00', 200, 0, 100, 'partially_refunded');
+    createSalesTransactionForDate($user, '2026-07-08 11:00:00', 200, 0, 0, 'voided');
+
+    $response = $this->actingAs($user, 'api')
+        ->getJson('/api/v1/reports/sales?period=daily');
+
+    $response->assertOk()
+        ->assertJsonPath('data.gross_sales', 600)
+        ->assertJsonPath('data.discounts', 20)
+        ->assertJsonPath('data.refunds', 100)
+        ->assertJsonPath('data.net_sales', 480)
+        ->assertJsonPath('data.total_sales', 480)
+        ->assertJsonPath('data.transactions', 4)
+        ->assertJsonPath('data.average_transaction', 160)
+        ->assertJsonPath('data.trend.0.total', 480)
+        ->assertJsonPath('data.sales_by_staff.Reconciliation Cashier', 480);
+
+    $csv = $this->actingAs($user, 'api')
+        ->get('/api/v1/reports/sales/export?format=csv&period=daily')
+        ->assertOk()
+        ->getContent();
+
+    expect($csv)
+        ->toContain('"Gross Sales",600')
+        ->toContain('Discounts,20')
+        ->toContain('Refunds,100')
+        ->toContain('"Net Sales",480');
 });
 
 test('custom report period uses explicit start and end dates', function () {

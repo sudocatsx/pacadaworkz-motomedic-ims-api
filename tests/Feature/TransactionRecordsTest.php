@@ -128,6 +128,8 @@ test('daily report uses gross and net sales and payment counts', function () {
         ->getJson('/api/v1/transactions/daily-report?date=2026-07-10')
         ->assertOk()
         ->assertJsonPath('data.sales_overview.gross_sales', 1000)
+        ->assertJsonPath('data.sales_overview.discounts', 100)
+        ->assertJsonPath('data.sales_overview.refunds', 200)
         ->assertJsonPath('data.sales_overview.net_sales', 700)
         ->assertJsonPath('data.payment_breakdown.0.payment_method', 'cash')
         ->assertJsonPath('data.payment_breakdown.0.count', 1);

@@ -14,7 +14,7 @@ class ReportsService
 {
     protected $reportCSVService;
 
-    public function __construct(ReportCSVService $reportCSVService)
+    public function __construct(ReportCSVService $reportCSVService, private readonly FinancialAggregationService $financials)
     {
         $this->reportCSVService = $reportCSVService;
     }
@@ -68,7 +68,7 @@ class ReportsService
         [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_transactions');
 
         $query = SalesTransaction::query();
-        $trendTotals = SalesTransaction::selectRaw('DATE(created_at) as date, SUM(total_amount) as total')
+        $trendTotals = SalesTransaction::selectRaw('DATE(created_at) as date, SUM('.FinancialAggregationService::NET_SALES.') as total')
             ->when($start && $end, function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
             })
@@ -81,7 +81,7 @@ class ReportsService
         $salesByStaff = DB::table('sales_transactions')
             ->leftJoin('users', 'sales_transactions.user_id', '=', 'users.id')
             ->whereBetween('sales_transactions.created_at', [$start, $end])
-            ->selectRaw("{$staffNameExpression} as staff_name, SUM(sales_transactions.total_amount) as total")
+            ->selectRaw("{$staffNameExpression} as staff_name, SUM(CASE WHEN sales_transactions.status = 'voided' THEN 0 ELSE sales_transactions.total_amount - COALESCE(sales_transactions.refund_amount, 0) END) as total")
             ->groupByRaw($staffNameExpression)
             ->orderByDesc('total')
             ->get()
@@ -93,10 +93,14 @@ class ReportsService
             $query->whereBetween('created_at', [$start, $end]);
         }
 
+        $revenueTransactions = (clone $query)->where('status', '!=', 'voided')->count();
+        $salesBridge = $this->financials->salesBridge($start, $end);
+
         return [
-            'total_sales' => $query->sum('total_amount'),
+            ...$salesBridge,
+            'total_sales' => $salesBridge['net_sales'],
             'transactions' => $query->count(),
-            'average_transaction' => round($query->avg('total_amount'), 2),
+            'average_transaction' => round($revenueTransactions > 0 ? $salesBridge['net_sales'] / $revenueTransactions : 0, 2),
             'trend' => $trend,
             'trend_granularity' => $trendGranularity,
             'sales_by_staff' => $salesByStaff,
@@ -333,7 +337,7 @@ class ReportsService
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'sales_items');
         $netQuantityExpression = 'CASE WHEN (c.quantity - COALESCE(c.quantity_returned, 0)) > 0 THEN (c.quantity - COALESCE(c.quantity_returned, 0)) ELSE 0 END';
-        $validRevenueExpression = "CASE WHEN st.id IS NOT NULL AND st.status != 'voided' THEN c.unit_price * {$netQuantityExpression} ELSE 0 END";
+        $validRevenueExpression = "CASE WHEN st.id IS NOT NULL AND st.status != 'voided' THEN COALESCE(NULLIF(c.net_line_total, 0), c.unit_price * {$netQuantityExpression}) - COALESCE(c.refunded_line_amount, 0) ELSE 0 END";
 
         $revenueByCategory = DB::table('categories as a')
             ->leftJoin('products as b', 'a.id', '=', 'b.category_id')
@@ -375,7 +379,7 @@ class ReportsService
                 'p.id as product_id',
                 'p.name as product_name',
                 DB::raw("SUM({$netQuantityExpression}) as quantity_sold"),
-                DB::raw("SUM(c.unit_price * {$netQuantityExpression}) as revenue")
+                DB::raw("SUM(COALESCE(NULLIF(c.net_line_total, 0), c.unit_price * {$netQuantityExpression}) - COALESCE(c.refunded_line_amount, 0)) as revenue")
             )
             ->groupBy('p.id', 'p.name')
             ->havingRaw("SUM({$netQuantityExpression}) > 0")
@@ -410,14 +414,13 @@ class ReportsService
         // Adjustment value
         $adjustmentValue = DB::table('stock_adjustments as a')
             ->join('stock_movements as b', 'a.id', '=', 'b.reference_id')
-            ->join('products as c', 'c.id', '=', 'b.product_id')
             ->where('b.reference_type', 'adjustment')
             ->whereBetween('a.created_at', [$start, $end])
             ->select(DB::raw("
             SUM(
                 CASE
-                    WHEN b.movement_type = 'in' THEN b.quantity * c.cost_price
-                    WHEN b.movement_type = 'out' THEN -b.quantity * c.cost_price
+                    WHEN b.movement_type = 'in' THEN b.quantity * a.unit_cost
+                    WHEN b.movement_type = 'out' THEN -b.quantity * a.unit_cost
                 END
             ) as adjustment_value
         "))
@@ -451,7 +454,9 @@ class ReportsService
 
         return [
             'total_adjustments' => $totalAdjustments,
-            'adjustments_value' => $adjustmentValue,
+            'net_adjustment_value' => (float) $adjustmentValue,
+            'adjustments_value' => (float) $adjustmentValue,
+            'stock_adjustment_losses' => $this->financials->adjustmentLosses($start, $end),
             'adjustments_by_reason' => $reasonCounts,
             'adjustments' => $adjustments,
         ];
@@ -461,42 +466,24 @@ class ReportsService
     {
         [$start, $end] = $this->normalizeDateRange($start, $end, 'stock_movements');
 
-        // Revenue
-        $revenue = SalesTransaction::whereBetween('created_at', [$start, $end])
-            ->sum('total_amount');
-
-        // Cost of goods sold
-        $costOfGoods = DB::table('sales_items as a')
-            ->join('products as b', 'b.id', '=', 'a.product_id')
-            ->whereBetween('a.created_at', [$start, $end])
-            ->select(DB::raw('SUM(a.quantity * b.cost_price) as cost_of_goods'))
-            ->value('cost_of_goods') ?? 0;
+        $revenue = $this->financials->netSales($start, $end);
+        $costOfGoods = $this->financials->cogs($start, $end);
 
         // Gross profit
         $grossProfit = $revenue - $costOfGoods;
 
-        $adjustmentLoss = DB::table('stock_adjustments as a')
-            ->join('stock_movements as b', 'a.id', '=', 'b.reference_id')
-            ->join('products as c', 'c.id', '=', 'b.product_id')->where('reference_type', 'adjustment')
-            ->where('movement_type', 'out')->whereBetween('a.created_at', [$start, $end])->select(DB::raw('SUM(b.quantity * c.cost_price) as total_cost'))
-            ->value('total_cost') ?? 0;
-
-        // Net profit
-        $netProfit = $grossProfit - $adjustmentLoss;
-
-        // Profit margin (%)
-        $profitMargin = $revenue > 0
-            ? round(($netProfit / $revenue) * 100, 2)
+        $adjustmentLoss = $this->financials->adjustmentLosses($start, $end);
+        $grossMargin = $revenue > 0
+            ? round(($grossProfit / $revenue) * 100, 2)
             : 0;
 
         return [
 
-            'revenue' => $revenue,
+            'net_sales' => $revenue,
             'cost_of_goods' => $costOfGoods,
             'gross_profit' => $grossProfit,
-            'adjustment_loss' => $adjustmentLoss,
-            'net_profit' => $netProfit,
-            'profit_margin' => $profitMargin,
+            'stock_adjustment_losses' => $adjustmentLoss,
+            'gross_margin' => $grossMargin,
         ];
     }
 
