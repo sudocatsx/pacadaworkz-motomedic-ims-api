@@ -232,10 +232,15 @@ Route::prefix('v1')->group(function () {
                         Route::get('/', [SystemSettingController::class, 'index'])->middleware('permissions:View');
                         Route::patch('/', [SystemSettingController::class, 'update'])->middleware('permissions:Edit');
 
-                        // Backup & Restore (Superadmin only)
+                        // Backup & Restore (exact Manage Database permission)
                         Route::middleware('permissions:Settings.Manage Database')->group(function () {
+                            Route::get('/database', [SystemSettingController::class, 'database']);
+                            Route::post('/backups', [SystemSettingController::class, 'createBackup']);
+                            Route::post('/backups/validate', [SystemSettingController::class, 'validateBackup']);
+                            Route::get('/backups/{filename}', [SystemSettingController::class, 'downloadBackup']);
+                            Route::delete('/backups/{filename}', [SystemSettingController::class, 'deleteBackup']);
                             Route::get('/backup', [SystemSettingController::class, 'backup']);
-                            Route::post('/restore', [SystemSettingController::class, 'restore']);
+                            Route::post('/restore', [SystemSettingController::class, 'restore'])->middleware('throttle:5,15');
                         });
                     });
                 });
