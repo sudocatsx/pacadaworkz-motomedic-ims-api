@@ -7,73 +7,61 @@ on:
 
 jobs:
   web-deploy:
-    name: 🎉 Deploy
+    name: Deploy
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: 🚚 Get latest code
-      uses: actions/checkout@v4
+      - name: Get latest code
+        uses: actions/checkout@v4
 
-# IBINALIK: Setup PHP (Kailangan ito para makapag-run ng Composer)
-    - name: 🐘 Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        extensions: mbstring, intl, pdo, pdo_mysql, mysqli
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo, pdo_pgsql, pgsql
 
-    
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
 
-   
-    - name: 📦 Install Composer Dependencies
-      run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+      - name: Install Composer dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
+      - name: Deploy system files
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ../
+          exclude: |
+            **/vendor/**
+            **/public/**
+            **/node_modules/**
+            **/.git*
+            **/.git*/**
+            **/tests/**
+            **/storage/*.key
+            .env
+            .env.example
+            .editorconfig
+            .gitattributes
+            .github/**
+            .styleci.yml
+            CHANGELOG.md
+            phpunit.xml
+            README.md
 
-    - name: 📂 Deploy System Files (Root)
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        
-       
-        server-dir: ../
-        
-
-        exclude: |
-          **/vendor/**
-          **/public/**
-          **/node_modules/**
-          **/.git*
-          **/.git*/**
-          **/tests/**
-          **/storage/*.key
-          .env
-          .env.example
-          .editorconfig
-          .gitattributes
-          .github/**
-          .styleci.yml
-          CHANGELOG.md
-          phpunit.xml
-          README.md
-          
-
-    - name: 📂 Deploy Public Files
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        
-        local-dir: ./public/
-        server-dir: ./
-
-        
+      - name: Deploy public files
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./public/
+          server-dir: ./

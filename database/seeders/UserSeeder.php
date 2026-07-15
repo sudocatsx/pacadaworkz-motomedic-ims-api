@@ -18,7 +18,11 @@ class UserSeeder extends Seeder
             ->whereIn('role_name', ['superadmin', 'admin', 'manager', 'staff'])
             ->pluck('id', 'role_name');
 
-        $password = 'Pacadaworkz@2026!';
+        $password = (string) config('auth.demo_user_password');
+        if ($password === '') {
+            throw new \RuntimeException('USER_DEFAULT_PASSWORD must be configured before seeding demo users.');
+        }
+
         $users = [
             [
                 'account' => 'Owner',
@@ -70,14 +74,14 @@ class UserSeeder extends Seeder
                 $user
             );
 
-            $credentials[] = [$account, $roleName, $user['name'], $user['email'], $password];
+            $credentials[] = [$account, $roleName, $user['name'], $user['email']];
         }
 
         if ($this->command) {
             $this->command->newLine();
             $this->command->info('Demo account credentials');
             $this->command->table(
-                ['Account', 'Role', 'Name', 'Email', 'Password'],
+                ['Account', 'Role', 'Name', 'Email'],
                 $credentials
             );
         }

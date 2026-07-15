@@ -25,7 +25,7 @@ test('user seeder assigns roles by name instead of relying on numeric ids', func
         ->toBe('staff');
 
     User::all()->each(function (User $user) {
-        expect(Hash::check('Pacadaworkz@2026!', $user->password))->toBeTrue()
+        expect(Hash::check((string) config('auth.demo_user_password'), $user->password))->toBeTrue()
             ->and($user->is_active)->toBeTrue();
     });
 });

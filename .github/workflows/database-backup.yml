@@ -1,0 +1,51 @@
+name: Back up Supabase database
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-testing-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Create and retain logical backup
+    runs-on: ubuntu-latest
+    environment: production-testing
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+      HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+      HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+      HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+      HOSTINGER_APP_PATH: ${{ secrets.HOSTINGER_APP_PATH }}
+    steps:
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$HOSTINGER_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Create public-schema backup
+        run: |
+          BACKUP_NAME="backup-$(date -u +'%Y-%m-%d_%H-%M-%S').dump"
+          printf 'BACKUP_NAME=%s\n' "$BACKUP_NAME" >> "$GITHUB_ENV"
+          docker run --rm \
+            -e DATABASE_URL="$SUPABASE_DB_URL" \
+            -e BACKUP_NAME="$BACKUP_NAME" \
+            -v "$RUNNER_TEMP:/backup" \
+            postgres:17 \
+            sh -c 'pg_dump "$DATABASE_URL" --schema=public --format=custom --no-owner --no-privileges --file="/backup/$BACKUP_NAME"'
+
+      - name: Upload backup to Hostinger
+        run: |
+          BACKUP_DIRECTORY="$HOSTINGER_APP_PATH/storage/app/private/backups"
+          ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST" "mkdir -p \"$BACKUP_DIRECTORY\""
+          scp -P "$HOSTINGER_SSH_PORT" "$RUNNER_TEMP/$BACKUP_NAME" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST:$BACKUP_DIRECTORY/$BACKUP_NAME"
+          ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST" "cd \"$BACKUP_DIRECTORY\" && ls -1t backup-*.dump 2>/dev/null | tail -n +8 | xargs -r rm --"

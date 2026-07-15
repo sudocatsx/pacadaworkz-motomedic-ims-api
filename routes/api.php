@@ -9,6 +9,7 @@ use App\Http\Controllers\API\CatalogImportController;
 use App\Http\Controllers\API\CategoryController;
 use App\Http\Controllers\API\DashboardController;
 use App\Http\Controllers\API\GoogleAuthController;
+use App\Http\Controllers\API\HealthController;
 use App\Http\Controllers\API\PermissionController;
 use App\Http\Controllers\API\PosController;
 use App\Http\Controllers\API\ProductController;
@@ -26,16 +27,7 @@ use App\Http\Controllers\API\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-
-    Route::get('/test-permissions', function () {
-        try {
-            \File::put(storage_path('test.txt'), 'ok');
-
-            return 'Storage writable!';
-        } catch (\Exception $e) {
-            return 'Error: '.$e->getMessage();
-        }
-    });
+    Route::get('/health', HealthController::class);
 
     // Public routes (Unauthenticated)
     Route::middleware('guest.api')->group(function () {
@@ -44,8 +36,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/login', [AuthController::class, 'login']);
             Route::post('/login/google', [GoogleAuthController::class, 'login']);
         });
-
-        Route::get('test-activity-logs', [ActivityLogController::class, 'showLogs']);
     });
 
     // Private routes (Authenticated)
