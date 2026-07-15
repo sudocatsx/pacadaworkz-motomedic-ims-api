@@ -20,6 +20,7 @@ class ActivityLogMiddleware
             'api/v1/auth/logout',
             'api/v1/pos/checkout',
             'api/v1/roles',
+            'api/v1/tutorials*',
 
         ];
 

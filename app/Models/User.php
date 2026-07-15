@@ -118,4 +118,14 @@ class User extends Authenticatable implements JWTSubject
             fn ($permission) => $permission->module === $module && $permission->name === $name
         ) ?? false;
     }
+
+    public function tutorialProgress(): HasMany
+    {
+        return $this->hasMany(TutorialProgress::class);
+    }
+
+    public function tutorialPreference(): HasOne
+    {
+        return $this->hasOne(TutorialPreference::class);
+    }
 }
