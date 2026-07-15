@@ -33,4 +33,12 @@ return [
         'version' => 1,
         'steps' => 5,
     ],
+    'settings-basics' => [
+        'version' => 1,
+        'steps' => 5,
+    ],
+    'database-backup-recovery' => [
+        'version' => 1,
+        'steps' => 7,
+    ],
 ];

@@ -81,7 +81,19 @@ test('all released tutorials accept their registered version and step bounds', f
     $user = User::factory()->create();
     $definitions = config('tutorials');
 
-    expect($definitions)->toHaveCount(8);
+    expect($definitions)->toHaveCount(10);
+    expect(array_keys($definitions))->toBe([
+        'pos-first-sale',
+        'dashboard-overview',
+        'manage-products',
+        'receive-purchase',
+        'review-transactions',
+        'reports-basics',
+        'manage-users',
+        'manage-roles',
+        'settings-basics',
+        'database-backup-recovery',
+    ]);
 
     foreach ($definitions as $key => $definition) {
         $url = "/api/v1/tutorials/{$key}/progress";
@@ -106,7 +118,7 @@ test('all released tutorials accept their registered version and step bounds', f
         ])->assertUnprocessable()->assertJsonValidationErrors('current_step');
     }
 
-    expect($user->tutorialProgress()->count())->toBe(8);
+    expect($user->tutorialProgress()->count())->toBe(10);
 });
 
 test('tutorial progress changes are not added to activity logs', function () {
