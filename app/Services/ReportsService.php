@@ -138,7 +138,7 @@ class ReportsService
             ]);
 
         return [
-            'total_purchases' => $ordersQuery->sum('total_amount'),
+            'total_purchases' => (float) $ordersQuery->sum('total_amount'),
             'purchase_orders' => $ordersQuery->count(),
             'average_orders' => $averageOrder,
             'trend' => $trend,

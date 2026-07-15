@@ -17,6 +17,8 @@ php artisan storage:link
 
 Set `APP_URL` to the public API origin so product image URLs returned to the React app and POS resolve correctly.
 
+See [Production-testing deployment](docs/production-testing-deployment.md) for the Hostinger, Supabase, Cloudflare Pages, CI/CD, and backup configuration.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

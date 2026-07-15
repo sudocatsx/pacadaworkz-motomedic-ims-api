@@ -1,0 +1,96 @@
+name: Restore Supabase database
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_file:
+        description: Backup filename stored on Hostinger
+        required: true
+        type: string
+      confirmation:
+        description: Type RESTORE to confirm replacement of the public schema
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-testing-database-maintenance
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    name: Validate and restore logical backup
+    if: inputs.confirmation == 'RESTORE'
+    runs-on: ubuntu-latest
+    environment: production-testing
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+      HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+      HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+      HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+      HOSTINGER_APP_PATH: ${{ secrets.HOSTINGER_APP_PATH }}
+      BACKUP_FILE: ${{ inputs.backup_file }}
+    steps:
+      - name: Validate requested filename
+        run: |
+          if [[ ! "$BACKUP_FILE" =~ ^backup-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.dump$ ]]; then
+            echo 'Invalid backup filename.' >&2
+            exit 1
+          fi
+
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$HOSTINGER_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Download and validate backup
+        run: |
+          BACKUP_DIRECTORY="$HOSTINGER_APP_PATH/storage/app/private/backups"
+          scp -P "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST:$BACKUP_DIRECTORY/$BACKUP_FILE" "$RUNNER_TEMP/$BACKUP_FILE"
+          docker run --rm -v "$RUNNER_TEMP:/backup" postgres:17 pg_restore --list "/backup/$BACKUP_FILE" >/dev/null
+
+      - name: Create pre-restore safety backup
+        run: |
+          SAFETY_NAME="backup-$(date -u +'%Y-%m-%d_%H-%M-%S').dump"
+          printf 'SAFETY_NAME=%s\n' "$SAFETY_NAME" >> "$GITHUB_ENV"
+          docker run --rm \
+            -e DATABASE_URL="$SUPABASE_DB_URL" \
+            -e SAFETY_NAME="$SAFETY_NAME" \
+            -v "$RUNNER_TEMP:/backup" \
+            postgres:17 \
+            sh -c 'pg_dump "$DATABASE_URL" --schema=public --format=custom --no-owner --no-privileges --file="/backup/$SAFETY_NAME"'
+          BACKUP_DIRECTORY="$HOSTINGER_APP_PATH/storage/app/private/backups"
+          scp -P "$HOSTINGER_SSH_PORT" "$RUNNER_TEMP/$SAFETY_NAME" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST:$BACKUP_DIRECTORY/$SAFETY_NAME"
+
+      - name: Enter maintenance mode
+        run: >-
+          ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
+          "cd \"$HOSTINGER_APP_PATH\" && php artisan down --retry=60"
+
+      - name: Restore public schema
+        run: |
+          docker run --rm \
+            -e DATABASE_URL="$SUPABASE_DB_URL" \
+            -e BACKUP_FILE="$BACKUP_FILE" \
+            -v "$RUNNER_TEMP:/backup" \
+            postgres:17 \
+            sh -c 'pg_restore --dbname="$DATABASE_URL" --clean --if-exists --no-owner --no-privileges --single-transaction "/backup/$BACKUP_FILE"'
+
+      - name: Apply current migrations and clear caches
+        run: >-
+          ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
+          "cd \"$HOSTINGER_APP_PATH\" && php artisan migrate --force && php artisan cache:clear && php artisan up"
+
+      - name: Ensure application leaves maintenance mode
+        if: always()
+        run: >-
+          ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
+          "cd \"$HOSTINGER_APP_PATH\" && php artisan up" || true
+
+      - name: Verify API health
+        run: curl --fail --show-error --silent https://pacadaworkz.bscs3a.com/api/v1/health
