@@ -21,6 +21,7 @@ use App\Http\Controllers\API\SalesController;
 use App\Http\Controllers\API\SupplierController;
 use App\Http\Controllers\API\SystemSettingController;
 use App\Http\Controllers\API\TransactionController;
+use App\Http\Controllers\API\TutorialController;
 use App\Http\Controllers\API\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,9 @@ Route::prefix('v1')->group(function () {
 
     // Private routes (Authenticated)
     Route::middleware('auth:api')->group(function () {
+        Route::get('/tutorials/progress', [TutorialController::class, 'index']);
+        Route::patch('/tutorials/preferences', [TutorialController::class, 'updatePreferences']);
+        Route::put('/tutorials/{tutorialKey}/progress', [TutorialController::class, 'updateProgress']);
         // Auth
         Route::prefix('auth')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
@@ -232,10 +236,15 @@ Route::prefix('v1')->group(function () {
                         Route::get('/', [SystemSettingController::class, 'index'])->middleware('permissions:View');
                         Route::patch('/', [SystemSettingController::class, 'update'])->middleware('permissions:Edit');
 
-                        // Backup & Restore (Superadmin only)
+                        // Backup & Restore (exact Manage Database permission)
                         Route::middleware('permissions:Settings.Manage Database')->group(function () {
+                            Route::get('/database', [SystemSettingController::class, 'database']);
+                            Route::post('/backups', [SystemSettingController::class, 'createBackup']);
+                            Route::post('/backups/validate', [SystemSettingController::class, 'validateBackup']);
+                            Route::get('/backups/{filename}', [SystemSettingController::class, 'downloadBackup']);
+                            Route::delete('/backups/{filename}', [SystemSettingController::class, 'deleteBackup']);
                             Route::get('/backup', [SystemSettingController::class, 'backup']);
-                            Route::post('/restore', [SystemSettingController::class, 'restore']);
+                            Route::post('/restore', [SystemSettingController::class, 'restore'])->middleware('throttle:5,15');
                         });
                     });
                 });

@@ -4,21 +4,13 @@ namespace App\Http\Requests\Settings;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class RestoreSystemSettingRequest extends FormRequest
+class ValidateDatabaseBackupRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return true; // Middleware handles role authorization
+        return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -32,8 +24,6 @@ class RestoreSystemSettingRequest extends FormRequest
                     }
                 },
             ],
-            'password' => ['required', 'string', 'current_password:api'],
-            'confirmation' => ['required', 'string', 'in:RESTORE DATABASE'],
         ];
     }
 }

@@ -2,22 +2,96 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Exceptions\DatabaseBackupException;
 use App\Http\Requests\Settings\RestoreSystemSettingRequest;
 use App\Http\Requests\Settings\UpdateSystemSettingRequest;
+use App\Http\Requests\Settings\ValidateDatabaseBackupRequest;
+use App\Services\DatabaseBackupService;
 use App\Services\SystemSettingService;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SystemSettingController extends Controller
 {
     protected $systemSettingService;
 
-    public function __construct(SystemSettingService $systemSettingService)
-    {
+    public function __construct(
+        SystemSettingService $systemSettingService,
+        private readonly DatabaseBackupService $databaseBackupService,
+    ) {
         $this->systemSettingService = $systemSettingService;
+    }
+
+    public function database(): JsonResponse
+    {
+        try {
+            return response()->json(['success' => true, 'data' => $this->databaseBackupService->status()]);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
+        }
+    }
+
+    public function createBackup(): JsonResponse
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'message' => 'Database backup created successfully.',
+                'data' => $this->databaseBackupService->createBackup(),
+            ], 201);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
+        }
+    }
+
+    public function downloadBackup(string $filename): StreamedResponse|JsonResponse
+    {
+        try {
+            $path = $this->databaseBackupService->backupPath($filename);
+
+            return Storage::disk((string) config('backup.disk'))->download($path, $filename, [
+                'Content-Type' => 'application/octet-stream',
+            ]);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
+        }
+    }
+
+    public function deleteBackup(string $filename): JsonResponse
+    {
+        try {
+            $this->databaseBackupService->deleteBackup($filename);
+
+            return response()->json(null, 204);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
+        }
+    }
+
+    public function validateBackup(ValidateDatabaseBackupRequest $request): JsonResponse
+    {
+        $path = null;
+
+        try {
+            $path = $this->storeTemporaryBackup($request->file('backup_file'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'The PostgreSQL backup is valid.',
+                'data' => $this->databaseBackupService->validateDump(Storage::disk((string) config('backup.disk'))->path($path)),
+            ]);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
+        } finally {
+            if ($path) {
+                Storage::disk((string) config('backup.disk'))->delete($path);
+            }
+        }
     }
 
     /**
@@ -75,18 +149,12 @@ class SystemSettingController extends Controller
     public function backup(): StreamedResponse|JsonResponse
     {
         try {
-            $path = $this->systemSettingService->backupDatabase();
+            $metadata = $this->databaseBackupService->createBackup();
+            $path = $this->databaseBackupService->backupPath($metadata['filename']);
 
-            return Storage::download($path);
-        } catch (Exception $e) {
-            Log::error('System Settings [BACKUP] Error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-            ], 500);
+            return Storage::disk((string) config('backup.disk'))->download($path, $metadata['filename']);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
         }
     }
 
@@ -95,40 +163,54 @@ class SystemSettingController extends Controller
      */
     public function restore(RestoreSystemSettingRequest $request): JsonResponse
     {
-        $uploadedFile = $request->file('backup_file');
         $tempPath = null;
 
         try {
-            // Store file temporarily
-            $filename = 'restore_'.time().'.'.$uploadedFile->getClientOriginalExtension();
-            $tempPath = $uploadedFile->storeAs('temp_restores', $filename);
-
-            $absolutePath = Storage::path($tempPath);
-
-            $this->systemSettingService->restoreDatabase($absolutePath);
-            // Cleanup
-            if ($tempPath && Storage::exists($tempPath)) {
-                Storage::delete($tempPath);
-            }
+            $tempPath = $this->storeTemporaryBackup($request->file('backup_file'));
+            $result = $this->databaseBackupService->restore(
+                Storage::disk((string) config('backup.disk'))->path($tempPath)
+            );
 
             return response()->json([
                 'success' => true,
-                'message' => 'System restored successfully.',
-            ], 201);
-        } catch (Exception $e) {
-            // Attempt cleanup on failure
-            if ($tempPath && Storage::exists($tempPath)) {
-                Storage::delete($tempPath);
-            }
-
-            Log::error('System Settings [RESTORE] Error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+                'message' => 'Database restored successfully. Sign in again to continue.',
+                'data' => $result,
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-            ], 500);
+        } catch (DatabaseBackupException $exception) {
+            return $this->databaseError($exception);
+        } finally {
+            if ($tempPath) {
+                Storage::disk((string) config('backup.disk'))->delete($tempPath);
+            }
         }
+    }
+
+    private function storeTemporaryBackup(UploadedFile $uploadedFile): string
+    {
+        $path = $uploadedFile->storeAs(
+            trim((string) config('backup.temporary_directory'), '/'),
+            'database-'.Str::uuid().'.dump',
+            (string) config('backup.disk')
+        );
+
+        if (! $path) {
+            throw new DatabaseBackupException('The uploaded backup could not be stored.', 'backup_upload_failed');
+        }
+
+        return $path;
+    }
+
+    private function databaseError(DatabaseBackupException $exception): JsonResponse
+    {
+        Log::warning('Database operation failed.', [
+            'error_code' => $exception->errorCode,
+            'message' => $exception->getMessage(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => $exception->getMessage(),
+            'error_code' => $exception->errorCode,
+        ], $exception->httpStatus);
     }
 }
