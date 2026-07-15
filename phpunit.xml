@@ -29,6 +29,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="USER_DEFAULT_PASSWORD" value="Pacadaworkz@Test2026!"/>
+        <env name="CORS_ALLOWED_ORIGINS" value="http://localhost:3001" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
