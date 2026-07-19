@@ -24,7 +24,7 @@ return [
     | may even configure multiple disks for the same driver. Examples for
     | most supported storage drivers are configured here for reference.
     |
-    | Supported drivers: "local", "ftp", "sftp", "s3"
+    | Supported drivers: "local", "ftp", "sftp", "s3", "r2"
     |
     */
 
@@ -58,6 +58,18 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,
+        ],
+
+        'r2_backups' => [
+            'driver' => 's3',
+            'key' => env('R2_BACKUP_ACCESS_KEY_ID'),
+            'secret' => env('R2_BACKUP_SECRET_ACCESS_KEY'),
+            'region' => env('R2_BACKUP_REGION', 'auto'),
+            'bucket' => env('R2_BACKUP_BUCKET'),
+            'endpoint' => env('R2_BACKUP_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'throw' => true,
+            'report' => true,
         ],
 
     ],
