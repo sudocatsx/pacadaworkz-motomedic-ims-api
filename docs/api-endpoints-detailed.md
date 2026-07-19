@@ -287,8 +287,12 @@
 | `PATCH`  | `/api/v1/settings/theme`          | Update theme preference  | Auth   | Light/Dark mode |
 | `GET`  | `/api/v1/settings/system`         | Get global system config | AP, WP | -               |
 | `PATCH`  | `/api/v1/settings/system`         | Update global config     | AP, WP | -               |
-| `GET`  | `/api/v1/settings/system/backup`  | Create system backup     | AP, WP | File Download   |
-| `PATCH`  | `/api/v1/settings/system/restore` | Restore from backup      | AP, WP | File Upload     |
+| `GET` | `/api/v1/settings/system/database` | Get provider status, quotas, active operation, and R2 history | `Settings.Manage Database` | Private metadata |
+| `POST` | `/api/v1/settings/system/backups` | Queue a manual GitHub/R2 backup | `Settings.Manage Database` | HTTP 202 |
+| `GET` | `/api/v1/settings/system/backups/{filename}` | Create a five-minute R2 download URL | `Settings.Manage Database` | History items only |
+| `DELETE` | `/api/v1/settings/system/backups/{filename}` | Delete a stored dump and checksum sidecar | `Settings.Manage Database` | Blocked while in use |
+| `GET` | `/api/v1/settings/system/operations/{id}` | Poll queued/running operation state | `Settings.Manage Database` | R2-backed status |
+| `POST` | `/api/v1/settings/system/restore` | Queue a guarded restore from R2 history | `Settings.Manage Database` | Password + exact phrase |
 
 ---
 

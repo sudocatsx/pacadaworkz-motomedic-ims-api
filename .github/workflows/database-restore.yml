@@ -1,16 +1,26 @@
-name: Restore Supabase database
+name: Restore database from R2
 
 on:
   workflow_dispatch:
     inputs:
-      backup_file:
-        description: Backup filename stored on Hostinger
+      operation_id:
+        description: Operation UUID created by the API
         required: true
         type: string
-      confirmation:
-        description: Type RESTORE to confirm replacement of the public schema
+      operation_key:
+        description: Private R2 operation metadata key
         required: true
         type: string
+      period:
+        description: Asia/Manila quota period (YYYY-MM)
+        required: true
+        type: string
+      backup_key:
+        description: Trusted R2 backup selected from application history
+        required: true
+        type: string
+
+run-name: Database restore (${{ inputs.operation_id }})
 
 permissions:
   contents: read
@@ -21,76 +31,179 @@ concurrency:
 
 jobs:
   restore:
-    name: Validate and restore logical backup
-    if: inputs.confirmation == 'RESTORE'
+    name: Validate, safeguard, and restore
     runs-on: ubuntu-latest
     environment: production-testing
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: true
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
       HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
       HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
       HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
       HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
       HOSTINGER_APP_PATH: ${{ secrets.HOSTINGER_APP_PATH }}
-      BACKUP_FILE: ${{ inputs.backup_file }}
+      OPERATION_ID: ${{ inputs.operation_id }}
+      OPERATION_KEY: ${{ inputs.operation_key }}
+      PERIOD: ${{ inputs.period }}
+      BACKUP_KEY: ${{ inputs.backup_key }}
+      RESTORE_MONTHLY_LIMIT: 10
+      SAFETY_STORAGE_LIMIT: 5
     steps:
-      - name: Validate requested filename
+      - name: Validate request and mark operation running
         run: |
-          if [[ ! "$BACKUP_FILE" =~ ^backup-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.dump$ ]]; then
-            echo 'Invalid backup filename.' >&2
-            exit 1
+          set -euo pipefail
+          [[ "$OPERATION_ID" =~ ^[0-9a-fA-F-]{36}$ ]]
+          [[ "$PERIOD" =~ ^[0-9]{4}-[0-9]{2}$ ]]
+          [[ "$OPERATION_KEY" == "database/operations/$PERIOD/$OPERATION_ID.json" ]]
+          [[ "$BACKUP_KEY" =~ ^database/(manual/backup|safety/pre-restore)-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.dump$ ]]
+          R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          BACKUP_NAME="${BACKUP_KEY##*/}"
+          printf 'R2_ENDPOINT=%s\nBACKUP_NAME=%s\n' "$R2_ENDPOINT" "$BACKUP_NAME" >> "$GITHUB_ENV"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "s3://$R2_BUCKET/$OPERATION_KEY" "$RUNNER_TEMP/operation.json"
+          jq \
+            --arg started_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '.status = "in_progress" | .message = "Restore is validating the selected backup." | .started_at = $started_at | .updated_at = $started_at | .run_url = $run_url' \
+            "$RUNNER_TEMP/operation.json" > "$RUNNER_TEMP/operation-running.json"
+          mv "$RUNNER_TEMP/operation-running.json" "$RUNNER_TEMP/operation.json"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$RUNNER_TEMP/operation.json" "s3://$R2_BUCKET/$OPERATION_KEY" --content-type application/json
+
+      - name: Enforce restore and safety storage limits
+        run: |
+          set -euo pipefail
+          USAGE_KEY="database/control/usage-$PERIOD.json"
+          if ! aws --endpoint-url "$R2_ENDPOINT" s3 cp "s3://$R2_BUCKET/$USAGE_KEY" "$RUNNER_TEMP/usage.json"; then
+            jq -n --arg period "$PERIOD" '{period: $period, manual_backups: 0, restores: 0}' > "$RUNNER_TEMP/usage.json"
           fi
+          USED="$(jq -r '.restores // 0' "$RUNNER_TEMP/usage.json")"
+          [[ "$USED" -lt "$RESTORE_MONTHLY_LIMIT" ]] || { echo 'Monthly restore limit reached.' >&2; exit 1; }
+          aws --endpoint-url "$R2_ENDPOINT" s3api list-objects-v2 \
+            --bucket "$R2_BUCKET" --prefix database/safety/ > "$RUNNER_TEMP/safety-objects.json"
+          STORED="$(jq '[.Contents[]? | select(.Key | endswith(".dump"))] | length' "$RUNNER_TEMP/safety-objects.json")"
+          [[ "$STORED" -lt "$SAFETY_STORAGE_LIMIT" ]] || { echo 'Stored safety backup limit reached.' >&2; exit 1; }
 
-      - name: Configure SSH
+      - name: Download and verify selected backup
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$HOSTINGER_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_HOST" >> ~/.ssh/known_hosts
+          set -euo pipefail
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "s3://$R2_BUCKET/$BACKUP_KEY" "$RUNNER_TEMP/$BACKUP_NAME"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "s3://$R2_BUCKET/$BACKUP_KEY.json" "$RUNNER_TEMP/$BACKUP_NAME.json"
+          EXPECTED_SHA="$(jq -r '.sha256 // empty' "$RUNNER_TEMP/$BACKUP_NAME.json")"
+          [[ -n "$EXPECTED_SHA" ]]
+          printf '%s  %s\n' "$EXPECTED_SHA" "$RUNNER_TEMP/$BACKUP_NAME" | sha256sum --check --status
+          docker run --rm -v "$RUNNER_TEMP:/backup" postgres:17 pg_restore --list "/backup/$BACKUP_NAME" >/dev/null
 
-      - name: Download and validate backup
+      - name: Create and upload pre-restore safety backup
         run: |
-          BACKUP_DIRECTORY="$HOSTINGER_APP_PATH/storage/app/private/backups"
-          scp -P "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST:$BACKUP_DIRECTORY/$BACKUP_FILE" "$RUNNER_TEMP/$BACKUP_FILE"
-          docker run --rm -v "$RUNNER_TEMP:/backup" postgres:17 pg_restore --list "/backup/$BACKUP_FILE" >/dev/null
-
-      - name: Create pre-restore safety backup
-        run: |
-          SAFETY_NAME="backup-$(date -u +'%Y-%m-%d_%H-%M-%S').dump"
-          printf 'SAFETY_NAME=%s\n' "$SAFETY_NAME" >> "$GITHUB_ENV"
+          set -euo pipefail
+          SAFETY_NAME="pre-restore-$(date -u +'%Y-%m-%d_%H-%M-%S').dump"
+          SAFETY_KEY="database/safety/$SAFETY_NAME"
+          printf 'SAFETY_NAME=%s\nSAFETY_KEY=%s\n' "$SAFETY_NAME" "$SAFETY_KEY" >> "$GITHUB_ENV"
           docker run --rm \
             -e DATABASE_URL="$SUPABASE_DB_URL" \
             -e SAFETY_NAME="$SAFETY_NAME" \
             -v "$RUNNER_TEMP:/backup" \
             postgres:17 \
-            sh -c 'pg_dump "$DATABASE_URL" --schema=public --format=custom --no-owner --no-privileges --file="/backup/$SAFETY_NAME"'
-          BACKUP_DIRECTORY="$HOSTINGER_APP_PATH/storage/app/private/backups"
-          scp -P "$HOSTINGER_SSH_PORT" "$RUNNER_TEMP/$SAFETY_NAME" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST:$BACKUP_DIRECTORY/$SAFETY_NAME"
+            sh -ceu 'pg_dump "$DATABASE_URL" --schema=public --format=custom --no-owner --no-privileges --file="/backup/$SAFETY_NAME"; pg_restore --list "/backup/$SAFETY_NAME" >/dev/null'
+          SHA256="$(sha256sum "$RUNNER_TEMP/$SAFETY_NAME" | cut -d ' ' -f1)"
+          SIZE_BYTES="$(stat -c '%s' "$RUNNER_TEMP/$SAFETY_NAME")"
+          CREATED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          jq -n \
+            --arg key "$SAFETY_KEY" \
+            --arg filename "$SAFETY_NAME" \
+            --arg type safety \
+            --arg sha256 "$SHA256" \
+            --arg created_at "$CREATED_AT" \
+            --arg source_key "$BACKUP_KEY" \
+            --argjson size_bytes "$SIZE_BYTES" \
+            '{key: $key, filename: $filename, type: $type, size_bytes: $size_bytes, created_at: $created_at, sha256: $sha256, verified: true, format: "PostgreSQL custom dump", source_key: $source_key}' \
+            > "$RUNNER_TEMP/$SAFETY_NAME.json"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$RUNNER_TEMP/$SAFETY_NAME" "s3://$R2_BUCKET/$SAFETY_KEY" --content-type application/octet-stream
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$RUNNER_TEMP/$SAFETY_NAME.json" "s3://$R2_BUCKET/$SAFETY_KEY.json" --content-type application/json
 
-      - name: Enter maintenance mode
+      - name: Count the restore execution
+        run: |
+          set -euo pipefail
+          USAGE_KEY="database/control/usage-$PERIOD.json"
+          RECORDED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          jq --arg updated_at "$RECORDED_AT" '.manual_backups = (.manual_backups // 0) | .restores = ((.restores // 0) + 1) | .updated_at = $updated_at' \
+            "$RUNNER_TEMP/usage.json" > "$RUNNER_TEMP/usage-updated.json"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$RUNNER_TEMP/usage-updated.json" "s3://$R2_BUCKET/$USAGE_KEY" --content-type application/json
+
+      - name: Configure Hostinger SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$HOSTINGER_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Enter application maintenance mode
         run: >-
           ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
           "cd \"$HOSTINGER_APP_PATH\" && php artisan down --retry=60"
 
-      - name: Restore public schema
+      - name: Restore the public schema
         run: |
+          set -euo pipefail
           docker run --rm \
             -e DATABASE_URL="$SUPABASE_DB_URL" \
-            -e BACKUP_FILE="$BACKUP_FILE" \
+            -e BACKUP_NAME="$BACKUP_NAME" \
             -v "$RUNNER_TEMP:/backup" \
             postgres:17 \
-            sh -c 'pg_restore --dbname="$DATABASE_URL" --clean --if-exists --no-owner --no-privileges --single-transaction "/backup/$BACKUP_FILE"'
+            sh -ceu 'pg_restore --dbname="$DATABASE_URL" --clean --if-exists --no-owner --no-privileges --single-transaction "/backup/$BACKUP_NAME"'
+          printf 'DATA_REPLACED=true\n' >> "$GITHUB_ENV"
 
-      - name: Apply current migrations and clear caches
+      - name: Apply migrations, rebuild caches, and leave maintenance mode
         run: >-
           ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
-          "cd \"$HOSTINGER_APP_PATH\" && php artisan migrate --force && php artisan cache:clear && php artisan up"
+          "cd \"$HOSTINGER_APP_PATH\" && php artisan optimize:clear && php artisan migrate --force && php artisan config:cache && php artisan up"
 
-      - name: Ensure application leaves maintenance mode
+      - name: Verify API health
+        run: curl --fail --show-error --silent https://pacadaworkz.bscs3a.com/api/v1/health
+
+      - name: Ensure the application leaves maintenance mode
         if: always()
         run: >-
           ssh -p "$HOSTINGER_SSH_PORT" "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
           "cd \"$HOSTINGER_APP_PATH\" && php artisan up" || true
 
-      - name: Verify API health
-        run: curl --fail --show-error --silent https://pacadaworkz.bscs3a.com/api/v1/health
+      - name: Publish operation result
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          R2_ENDPOINT="${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}"
+          if ! aws --endpoint-url "$R2_ENDPOINT" s3 cp "s3://$R2_BUCKET/$OPERATION_KEY" "$RUNNER_TEMP/operation-final.json"; then
+            exit 0
+          fi
+          FINISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          if [[ "$JOB_STATUS" == "success" ]]; then
+            STATUS=succeeded
+            MESSAGE='Restore completed successfully. Sign in again to continue.'
+          else
+            STATUS=failed
+            if [[ "${DATA_REPLACED:-false}" == "true" ]]; then
+              MESSAGE='Database data was replaced, but post-restore verification failed. Sign in again and open the technical details.'
+            elif [[ -n "${SAFETY_KEY:-}" ]]; then
+              MESSAGE='Restore failed. The pre-restore safety backup remains available. Open the technical details.'
+            else
+              MESSAGE='Restore failed before a safety backup was created. Current data was not replaced. Open the technical details.'
+            fi
+          fi
+          jq \
+            --arg status "$STATUS" \
+            --arg message "$MESSAGE" \
+            --arg finished_at "$FINISHED_AT" \
+            --arg safety_key "${SAFETY_KEY:-}" \
+            --arg safety_filename "${SAFETY_NAME:-}" \
+            --argjson data_replaced "${DATA_REPLACED:-false}" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '.status = $status | .message = $message | .finished_at = $finished_at | .updated_at = $finished_at | .run_url = $run_url | .data_replaced = $data_replaced | if $safety_key != "" then .safety_backup_key = $safety_key | .safety_backup_filename = $safety_filename else . end' \
+            "$RUNNER_TEMP/operation-final.json" > "$RUNNER_TEMP/operation-result.json"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$RUNNER_TEMP/operation-result.json" "s3://$R2_BUCKET/$OPERATION_KEY" --content-type application/json

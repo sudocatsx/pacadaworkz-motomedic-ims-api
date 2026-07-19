@@ -1,63 +1,91 @@
 <?php
 
 use App\Exceptions\DatabaseBackupException;
+use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\DatabaseBackupService;
-use App\Services\PostgresProcessRunner;
-use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process;
+use App\Services\DatabaseBackupStore;
+use App\Services\GitHubWorkflowDispatcher;
 use Tests\TestCase;
 
 uses(TestCase::class);
 
 beforeEach(function () {
-    Storage::fake('local');
     config()->set('database.default', 'pgsql');
-    config()->set('database.connections.pgsql', [
-        'host' => '127.0.0.1',
-        'port' => '5432',
-        'username' => 'postgres',
-        'password' => 'secret',
-        'database' => 'motomedic',
-    ]);
-    config()->set('backup.disk', 'local');
-    config()->set('backup.directory', 'backups');
-    config()->set('backup.pg_dump_binary', '/bin/true');
-    config()->set('backup.pg_restore_binary', '/bin/true');
+    config()->set('backup.github.repository', 'owner/repository');
+    config()->set('backup.github.token', 'token');
+    config()->set('backup.github.ref', 'master');
+    config()->set('backup.github.backup_workflow', 'database-backup.yml');
+    config()->set('backup.github.restore_workflow', 'database-restore.yml');
+    config()->set('backup.manual_monthly_limit', 5);
+    config()->set('backup.restore_monthly_limit', 10);
+    config()->set('backup.manual_storage_limit', 5);
+    config()->set('backup.safety_storage_limit', 5);
 });
 
-test('backup service creates a private custom dump without exposing the password in arguments', function () {
-    $process = Mockery::mock(Process::class);
-    $process->shouldReceive('isSuccessful')->andReturnTrue();
-    $runner = Mockery::mock(PostgresProcessRunner::class);
-    $runner->shouldReceive('run')->once()->withArgs(function (array $command, array $environment, int $timeout) {
-        $fileArgument = collect($command)->first(fn (string $argument) => str_starts_with($argument, '--file='));
-        file_put_contents(substr($fileArgument, 7), 'PGDMP-test-archive');
+function backupActor(): User
+{
+    return (new User)->forceFill(['id' => 7, 'email' => 'admin@example.com']);
+}
 
-        expect($command)->toContain('--format=custom')
-            ->and($command)->not->toContain('secret')
-            ->and($environment['PGPASSWORD'])->toBe('secret')
-            ->and($timeout)->toBe(300);
+test('manual backup creates operation metadata and dispatches the configured workflow', function () {
+    $store = Mockery::mock(DatabaseBackupStore::class);
+    $store->shouldReceive('configured')->andReturnTrue();
+    $store->shouldReceive('usage')->once()->andReturn(['manual_backups' => 0, 'restores' => 0]);
+    $store->shouldReceive('backups')->once()->andReturn([]);
+    $store->shouldReceive('activeOperation')->once()->andReturnNull();
+    $store->shouldReceive('operationPath')->once()->andReturnUsing(fn (string $period, string $id) => "database/operations/{$period}/{$id}.json");
+    $store->shouldReceive('putOperation')->once()->with(Mockery::on(fn (array $operation) => $operation['type'] === 'backup' && $operation['status'] === 'queued'));
 
-        return true;
-    })->andReturn($process);
+    $dispatcher = Mockery::mock(GitHubWorkflowDispatcher::class);
+    $dispatcher->shouldReceive('dispatch')->once()->with('database-backup.yml', Mockery::on(fn (array $inputs) => isset($inputs['operation_id'], $inputs['operation_key'], $inputs['period'])));
     $activity = Mockery::mock(ActivityLogService::class)->shouldIgnoreMissing();
 
-    $metadata = (new DatabaseBackupService($runner, $activity))->createBackup();
+    $operation = (new DatabaseBackupService($store, $dispatcher, $activity))->createBackup(backupActor());
 
-    expect($metadata['filename'])->toMatch('/^backup-.*\.dump$/')
-        ->and($metadata['type'])->toBe('manual')
-        ->and($metadata['size_bytes'])->toBeGreaterThan(5);
-    Storage::disk('local')->assertExists('backups/'.$metadata['filename']);
+    expect($operation['type'])->toBe('backup')
+        ->and($operation['status'])->toBe('queued')
+        ->and($operation['requested_by']['email'])->toBe('admin@example.com');
 });
 
-test('backup validation rejects a renamed non PostgreSQL file before running pg_restore', function () {
-    $path = Storage::disk('local')->path('temp/fake.dump');
-    Storage::disk('local')->put('temp/fake.dump', 'not-a-postgres-dump');
-    $runner = Mockery::mock(PostgresProcessRunner::class);
-    $runner->shouldNotReceive('run');
+test('manual backup quota is enforced before workflow dispatch', function () {
+    $store = Mockery::mock(DatabaseBackupStore::class);
+    $store->shouldReceive('configured')->andReturnTrue();
+    $store->shouldReceive('usage')->once()->andReturn(['manual_backups' => 5, 'restores' => 0]);
+    $store->shouldReceive('backups')->once()->andReturn([]);
+    $store->shouldReceive('activeOperation')->once()->andReturnNull();
+    $dispatcher = Mockery::mock(GitHubWorkflowDispatcher::class);
+    $dispatcher->shouldNotReceive('dispatch');
     $activity = Mockery::mock(ActivityLogService::class)->shouldIgnoreMissing();
 
-    expect(fn () => (new DatabaseBackupService($runner, $activity))->validateDump($path))
-        ->toThrow(DatabaseBackupException::class, 'Only PostgreSQL custom-format .dump backups are supported.');
+    expect(fn () => (new DatabaseBackupService($store, $dispatcher, $activity))->createBackup(backupActor()))
+        ->toThrow(DatabaseBackupException::class, 'The monthly manual backup limit has been reached.');
+});
+
+test('restore dispatches only the trusted R2 key resolved from history', function () {
+    $backup = [
+        'filename' => 'backup-2026-07-19_10-00-00.dump',
+        'key' => 'database/manual/backup-2026-07-19_10-00-00.dump',
+        'type' => 'manual',
+        'verified' => true,
+    ];
+    $store = Mockery::mock(DatabaseBackupStore::class);
+    $store->shouldReceive('configured')->andReturnTrue();
+    $store->shouldReceive('resolveBackup')->once()->with($backup['filename'])->andReturn($backup);
+    $store->shouldReceive('usage')->once()->andReturn(['manual_backups' => 1, 'restores' => 0]);
+    $store->shouldReceive('backups')->once()->andReturn([$backup]);
+    $store->shouldReceive('activeOperation')->once()->andReturnNull();
+    $store->shouldReceive('operationPath')->once()->andReturnUsing(fn (string $period, string $id) => "database/operations/{$period}/{$id}.json");
+    $store->shouldReceive('putOperation')->once();
+
+    $dispatcher = Mockery::mock(GitHubWorkflowDispatcher::class);
+    $dispatcher->shouldReceive('dispatch')->once()->with('database-restore.yml', Mockery::on(
+        fn (array $inputs) => $inputs['backup_key'] === $backup['key']
+    ));
+    $activity = Mockery::mock(ActivityLogService::class)->shouldIgnoreMissing();
+
+    $operation = (new DatabaseBackupService($store, $dispatcher, $activity))->restore($backup['filename'], backupActor());
+
+    expect($operation['type'])->toBe('restore')
+        ->and($operation['backup_key'])->toBe($backup['key']);
 });

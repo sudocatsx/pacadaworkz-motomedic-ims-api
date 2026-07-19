@@ -241,7 +241,11 @@ GET /api/v1/settings/profile (requires auth)
 PUT /api/v1/settings/profile (requires auth)
 PUT /api/v1/settings/password (requires auth)
 PUT /api/v1/settings/theme (requires auth)
-GET /api/v1/settings/system/backup (AP and WP only)
-PUT /api/v1/settings/system/restore (AP and WP only)
+GET /api/v1/settings/system/database (Settings.Manage Database)
+POST /api/v1/settings/system/backups (Settings.Manage Database; queues manual backup)
+GET /api/v1/settings/system/backups/:filename (Settings.Manage Database; returns temporary download URL)
+DELETE /api/v1/settings/system/backups/:filename (Settings.Manage Database)
+GET /api/v1/settings/system/operations/:id (Settings.Manage Database)
+POST /api/v1/settings/system/restore (Settings.Manage Database; queues history-only restore)
 
 ```

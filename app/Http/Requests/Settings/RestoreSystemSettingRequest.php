@@ -22,16 +22,7 @@ class RestoreSystemSettingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'backup_file' => [
-                'required',
-                'file',
-                'max:'.(int) config('backup.max_upload_kb'),
-                function ($attribute, $value, $fail): void {
-                    if (strtolower($value->getClientOriginalExtension()) !== 'dump') {
-                        $fail('Only PostgreSQL .dump backup files are supported.');
-                    }
-                },
-            ],
+            'filename' => ['required', 'string', 'max:255', 'regex:/^(backup|pre-restore)-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.dump$/'],
             'password' => ['required', 'string', 'current_password:api'],
             'confirmation' => ['required', 'string', 'in:RESTORE DATABASE'],
         ];
